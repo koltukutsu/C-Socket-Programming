@@ -20,7 +20,7 @@ void send_command(int socket, const char *command, const char *message) {
 }
 
 int showMenu();
-void userChoiceOperations(int choice, int client_socket);
+void userChoiceOperations(int choice, int client_socket, char *userId);
 void getContacts(char *userId, int client_socket);
 void addUser(int client_socket);
 void deleteUser(int client_socket);
@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
   do {
     // Get user input for the command
     choice = showMenu();
-    userChoiceOperations(choice, client_socket);
+    userChoiceOperations(choice, client_socket, userId);
     // Get user input for the message (if the command is "take")
     char message[MAX_BUFFER_SIZE];
     if (strcmp(command, "take") == 0) {
