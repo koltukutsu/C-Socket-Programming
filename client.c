@@ -18,8 +18,14 @@ void send_command(int socket, const char *command, const char *message) {
     send(socket, message, strlen(message), 0);
   }
 }
+
 int showMenu();
 void userChoiceOperations(int choice, int client_socket);
+void getContacts(char *userId, int client_socket);
+void addUser(int client_socket);
+void deleteUser(int client_socket);
+void sendMessages(int client_socket);
+void checkMessages(int client_socket);
 
 int main(int argc, char *argv[]) {
   int client_socket;
@@ -63,21 +69,15 @@ int main(int argc, char *argv[]) {
     choice = showMenu();
     userChoiceOperations(choice, client_socket);
     // Get user input for the message (if the command is "take")
-    // char message[MAX_BUFFER_SIZE];
-    // if (strcmp(command, "take") == 0) {
-    //   printf("Enter message to be saved: ");
-    //   fgets(message, sizeof(message), stdin);
-    //   message[strcspn(message, "\n")] = '\0'; // Remove newline character
-    // } else {
-    //   // If the command is "send," set an empty message
-    //   message[0] = '\0';
-    // }
-
-    // // Send the user input to the server
-    // send_command(client_socket, command, message);
-
-    // Receive and print the server's response
-
+    char message[MAX_BUFFER_SIZE];
+    if (strcmp(command, "take") == 0) {
+      printf("Enter message to be saved: ");
+      fgets(message, sizeof(message), stdin);
+      message[strcspn(message, "\n")] = '\0'; // Remove newline character
+    } else {
+      // If the command is "send," set an empty message
+      message[0] = '\0';
+    }
   } while (choice != 6);
   // Close the client socket
   close(client_socket);
@@ -106,36 +106,103 @@ int showMenu() {
   return choice;
 }
 
-void userChoiceOperations(int choice, int client_socket) {
+void userChoiceOperations(int choice, int client_socket, char *userId) {
   switch (choice) {
   case 1:
     printf("\tYour Contacts:\n");
+    getContacts(userId, client_socket);
     break;
   case 2:
     printf("\tAdding User:\n");
+    addUser(client_socket);
     break;
   case 3:
     printf("\tDeleting User:\n");
+    deleteUser(client_socket);
     break;
   case 4:
     printf("\tSending Messages:\n");
+    sendMessages(client_socket);
     break;
   case 5:
+    checkMessages(client_socket);
     printf("\tChecking Messages:\n");
     break;
   case 6:
     printf("\tClosing the client now...\n");
     break;
   defult:
-  break;
+    break;
   }
+}
+//// MENU
+// 1. get contacts
+void getContacts(char *userId, int client_socket) {
+  char *command = "takeContacts:userId";
+  send(client_socket, command, strlen(command), 0);
 
-  // char buffer[MAX_BUFFER_SIZE];
-  // ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
-  // if (received_bytes > 0) {
-  //   buffer[received_bytes] = '\0'; // Null-terminate the received data
-  //   printf("Server response: %s\n", buffer);
-  // } else {
-  //   perror("Error receiving data from server");
-  // }
+
+  // server response
+  char buffer[MAX_BUFFER_SIZE];
+  ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+  if (received_bytes > 0) {
+    buffer[received_bytes] = '\0'; // Null-terminate the received data
+    printf("Server response: %s\n", buffer);
+  } else {
+    perror("Error receiving data from server");
+  }
+}
+// 2. add user
+void addUser(int client_socket) {
+  // client function
+  // server response
+  char buffer[MAX_BUFFER_SIZE];
+  ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+  if (received_bytes > 0) {
+    buffer[received_bytes] = '\0'; // Null-terminate the received data
+    printf("Server response: %s\n", buffer);
+  } else {
+    perror("Error receiving data from server");
+  }
+}
+// 3. delete user
+void deleteUser(int client_socket) {
+  // client function
+  // server response
+  char buffer[MAX_BUFFER_SIZE];
+  ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+  if (received_bytes > 0) {
+    buffer[received_bytes] = '\0'; // Null-terminate the received data
+    printf("Server response: %s\n", buffer);
+  } else {
+    perror("Error receiving data from server");
+  }
+}
+
+// 4. send messages
+void sendMessages(int client_socket) {
+  // client function
+  // server response
+  char buffer[MAX_BUFFER_SIZE];
+  ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+  if (received_bytes > 0) {
+    buffer[received_bytes] = '\0'; // Null-terminate the received data
+    printf("Server response: %s\n", buffer);
+  } else {
+    perror("Error receiving data from server");
+  }
+}
+
+// 5. check messages
+void checkMessages(int client_socket) {
+  // client function
+  // server response
+  char buffer[MAX_BUFFER_SIZE];
+  ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+  if (received_bytes > 0) {
+    buffer[received_bytes] = '\0'; // Null-terminate the received data
+    printf("Server response: %s\n", buffer);
+  } else {
+    perror("Error receiving data from server");
+  }
 }

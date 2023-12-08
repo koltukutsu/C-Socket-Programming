@@ -7,13 +7,38 @@
 #define PORT 3000
 #define MAX_BUFFER_SIZE 1024
 
-void handleClient(int client_socket);
+// messages
+typedef struct message{
+    char correspondentId[10];
+    char message[255];
+}Message;
+// correspondent contact
+typedef struct contact {
+    char contactUserId[10];
+    char phoneNumber[13];
+    char name[15];
+    char surname[15];
+}Contact;
 
+// user 
+typedef struct user {
+    char userId[10];
+    Contact contactsList[100];
+    Message messagesList[255];
+} User;
+
+void handleClient(int client_socket, User *userList);
+void sendContacts(char *userId, User *userList);
+void addUser();
+void deleteUser();
+void deleteUser();
+void takeMessages();
+void checkMessage();
 int main() {
     int server_socket, client_socket;
     struct sockaddr_in server_address, client_address;
     socklen_t client_address_len = sizeof(client_address);
-
+    User userList[100];
     // Create a socket
     if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("Error creating socket");
@@ -51,7 +76,7 @@ int main() {
         printf("Connection accepted from %s\n", inet_ntoa(client_address.sin_addr));
 
         // Handle the client's request
-        handleClient(client_socket);
+        handleClient(client_socket, userList);
     }
 
     // Close the server socket
@@ -61,7 +86,7 @@ int main() {
 }
 
 
-void handleClient(int client_socket) {
+void handleClient(int client_socket, User *userList) {
     char buffer[MAX_BUFFER_SIZE];
 
     // Receive command from the client
@@ -74,9 +99,15 @@ void handleClient(int client_socket) {
 
     buffer[received_bytes] = '\0'; // Null-terminate the received data
 
-    // Check the received command
-	// fflush(stdout);
-	// printf("\n Accepted buffer: %s", buffer);
+    if(strncmp(buffer, "takeContacts", 12) == 0) {
+        
+        char userId[4];
+        int pos = 13;
+         strncpy(userId, buffer + (pos - 1), 3);
+        // take the user id from the buffer
+        sendContacts(userId, userList);
+    }
+
     if (strcmp(buffer, "send") == 0) {
         // If the command is "send," send a message to the client
         const char *message = "Hello from the server!";
@@ -105,3 +136,35 @@ void handleClient(int client_socket) {
     // Close the connection
     close(client_socket);
 }
+
+void sendContacts(char userId[4], User *userList){
+    char delimiterContact = ':';
+    char delimeterFields = '_';
+    int counter = 0;
+    while(strcmp(userList[counter].userId, userId) != 0 && counter < 100) {
+        counter ++;
+    }
+
+    if(strcmp(userList[counter].userId, userId) == 0) {
+        // write to buffer
+
+        // send the buffer
+    }
+
+    return;
+    
+
+}
+
+void addUser(){
+
+}
+void deleteUser(){
+
+}
+
+void takeMessages(){
+
+}
+
+void checkMessage(){}
