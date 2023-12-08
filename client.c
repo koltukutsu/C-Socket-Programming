@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
   int choice;
   struct sockaddr_in server_address;
   int flag = 0;
-  char userId[50];
+  char userId[4];
   // server id control
   if (argc != 2) {
     printf("CLIENT - Give a user id only as an argument.\n");
