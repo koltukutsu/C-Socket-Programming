@@ -6,27 +6,17 @@
 #include <unistd.h>
 
 #define SERVER_IP "127.0.0.1"
-#define PORT 6011
+#define PORT 6012
 #define MAX_BUFFER_SIZE 1024
 
-void send_command(int socket, const char *command, const char *message) {
-  // Send the command to the server
-  send(socket, command, strlen(command), 0);
-
-  // If the command is "take," send the message as well
-  if (strcmp(command, "take") == 0) {
-    send(socket, message, strlen(message), 0);
-  }
-}
-
 int showMenu();
-void sendUserId(int client_socket, char userId[4]);
+// void sendUserId(int client_socket, char userId[4]);
 void userChoiceOperations(int choice, int client_socket, char *userId);
-void getContacts(char *userId, int client_socket);
-void addUser(int client_socket);
-void deleteUser(int client_socket);
-void sendMessages(int client_socket);
-void checkMessages(int client_socket);
+void getContacts(char userId[4], int client_socket);
+void addUser(char userId[4], int client_socket);
+void deleteUser(char userId[4], int client_socket);
+void sendMessages(char userId[4], int client_socket);
+void checkMessages(char userId[4], int client_socket);
 
 int main(int argc, char *argv[]) {
   int client_socket;
@@ -69,7 +59,7 @@ int main(int argc, char *argv[]) {
     // Get user input for the command
     if (initiation) {
       printf("Client - initiating the user process...\n");
-      sendUserId(client_socket, userId);
+      // sendUserId(client_socket, userId);
       initiation = false;
     } else {
       printf("Client - continuing with the menu...\n");
@@ -113,20 +103,20 @@ int showMenu() {
   } while (_stop);
   return choice;
 }
-void sendUserId(int client_socket, char userId[4]) {
-  printf("CLIENT %s - Sending User Id: %s\n", userId, userId);
-  send(client_socket, userId, strlen(userId), 0);
+// void sendUserId(int client_socket, char userId[4]) {
+//   printf("CLIENT %s - Sending User Id: %s\n", userId, userId);
+//   send(client_socket, userId, strlen(userId), 0);
 
-  // server response
-  char buffer[MAX_BUFFER_SIZE];
-  ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
-  if (received_bytes > 0) {
-    buffer[received_bytes] = '\0'; // Null-terminate the received data
-    printf("Server response: %s\n", buffer);
-  } else {
-    perror("Error receiving data from server");
-  }
-}
+//   // server response
+//   char buffer[MAX_BUFFER_SIZE];
+//   ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+//   if (received_bytes > 0) {
+//     buffer[received_bytes] = '\0'; // Null-terminate the received data
+//     printf("Server response: %s\n", buffer);
+//   } else {
+//     perror("Error receiving data from server");
+//   }
+// }
 void userChoiceOperations(int choice, int client_socket, char *userId) {
   switch (choice) {
   case 1:
@@ -135,18 +125,18 @@ void userChoiceOperations(int choice, int client_socket, char *userId) {
     break;
   case 2:
     printf("\tAdding User:\n");
-    addUser(client_socket);
+    addUser(userId, client_socket);
     break;
   case 3:
     printf("\tDeleting User:\n");
-    deleteUser(client_socket);
+    deleteUser(userId, client_socket);
     break;
   case 4:
     printf("\tSending Messages:\n");
-    sendMessages(client_socket);
+    sendMessages(userId, client_socket);
     break;
   case 5:
-    checkMessages(client_socket);
+    checkMessages(userId, client_socket);
     printf("\tChecking Messages:\n");
     break;
   case 6:
@@ -158,8 +148,11 @@ void userChoiceOperations(int choice, int client_socket, char *userId) {
 }
 //// MENU
 // 1. get contacts
-void getContacts(char *userId, int client_socket) {
-  char *command = "takeContacts:userId";
+void getContacts(char userId[4], int client_socket) {
+  char command[MAX_BUFFER_SIZE];
+  strcpy(command, userId);
+  strcat(command, ":1");
+  puts("\nCLIENT - get contacts: "); puts( command);
   send(client_socket, command, strlen(command), 0);
 
   // server response
@@ -173,7 +166,7 @@ void getContacts(char *userId, int client_socket) {
   }
 }
 // 2. add user
-void addUser(int client_socket) {
+void addUser(char userId[4], int client_socket) {
   // client function
   // char *command = "addUser:userId";
   char message[MAX_BUFFER_SIZE];
@@ -181,7 +174,8 @@ void addUser(int client_socket) {
   char name[15];
   char surname[15];
   char phone[14];
-  strcpy(message, "addUser:");
+  strcpy(message, userId);
+  strcat(message, ":2:");
   printf("\nEnter ID MobilePhone Name Surname, in order: ");
   printf("\nID: ");
   scanf("%s", id);
@@ -192,13 +186,13 @@ void addUser(int client_socket) {
   printf("\nPhone: ");
   scanf("%s", phone);
 
-  strcpy(message, id);
-  strcpy(message, "_");
-  strcpy(message, phone);
-  strcpy(message, "_");
-  strcpy(message, name);
-  strcpy(message, "_");
-  strcpy(message, surname);
+  strcat(message, id);
+  strcat(message, "_");
+  strcat(message, phone);
+  strcat(message, "_");
+  strcat(message, name);
+  strcat(message, "_");
+  strcat(message, surname);
 
   message[strcspn(message, "\n")] = '\0'; // Remove newline character
   printf("Client - ADD User: %s", message);
@@ -215,9 +209,12 @@ void addUser(int client_socket) {
   }
 }
 // 3. delete user
-void deleteUser(int client_socket) {
+void deleteUser(char userId[4], int client_socket) {
   // client function
-  char *command = "deleteUser:userId";
+  char command[MAX_BUFFER_SIZE];
+  strcpy(command, userId);
+  strcat(command, ":3:");
+  // delete user things
   send(client_socket, command, strlen(command), 0);
 
   // server response
@@ -232,8 +229,11 @@ void deleteUser(int client_socket) {
 }
 
 // 4. send messages
-void sendMessages(int client_socket) {
+void sendMessages(char userId[4], int client_socket) {
   // client function
+  char command[MAX_BUFFER_SIZE];
+  strcpy(command, userId);
+  strcat(command, ":4:");
   // server response
   char buffer[MAX_BUFFER_SIZE];
   ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
@@ -246,8 +246,11 @@ void sendMessages(int client_socket) {
 }
 
 // 5. check messages
-void checkMessages(int client_socket) {
+void checkMessages(char userId[4], int client_socket) {
   // client function
+  char command[MAX_BUFFER_SIZE];
+  strcpy(command, userId);
+  strcat(command, ":5:");
   // server response
   char buffer[MAX_BUFFER_SIZE];
   ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);

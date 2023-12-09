@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define PORT 6011
+#define PORT 6012
 #define MAX_BUFFER_SIZE 1024
 
 // messages
@@ -35,7 +35,7 @@ typedef struct user {
 } User;
 
 void handleClient(int client_socket, User **userList, char *userId);
-void sendContacts(char *userId, User **userList);
+void sendContacts(char *userId, User **userList, int client_socket);
 void addUser(char userId[4], User **userList);
 void deleteUser(char userId[4], User **userList);
 void takeMessages(char userId[4], User **userList);
@@ -107,33 +107,64 @@ void handleClient(int client_socket, User **userList, char userId[4]) {
     return;
   }
   buffer[received_bytes] = '\0'; // Null-terminate the received data
-  if (strlen(buffer) == 3) {
-    char newUserId[4];
+  // if (strlen(buffer) == 3) {
+  if (false) {
     strncpy(userId, buffer, 3);
-    newUserId[3] = '\0';
 
     // TODO: using the user id, create a new User
-
     printf("SERVER - Used id is taken: %s\nServer - notifying the user...\n",
            userId);
     const char *message = "\tServer accepted the user id.";
     send(client_socket, message, strlen(message), 0);
   } else {
-    puts("\n2 else");
-    if (strncmp(buffer, "takeContacts", 12) == 0) {
-      char userId[4];
-      int pos = 13;
-      strncpy(userId, buffer + (pos - 1), 3);
-      // take the user id from the buffer
-      sendContacts(userId, userList);
-    } else if (strncmp(buffer, "addUser", 7) == 0) {
+    char mode;
+    puts("\nSecond way");
+    strncpy(userId, buffer, 3);
+    mode = buffer[4];
+    printf("SERVER - Connected client Id: %s and mode: %c", userId, mode);
+    char new[2];
+    new[0] = mode;
+    new[1] = '\0';
+    puts(new);
+    switch (mode) {
+    case '1':
+      puts("\nSERVER - 1 - request to send Contacts");
+      sendContacts(userId, userList, client_socket);
+      break;
+    case '2':
+      puts("\nSERVER - 2 - request to add User");
       addUser(userId, userList);
-    } else if (strncmp(buffer, "deleteUser", 10) == 0) {
-
-    } else if (strncmp(buffer, "sendMessages", 12) == 0) {
-
-    } else if (strncmp(buffer, "checkMessages", 13) == 0) {
+      break;
+    case '3':
+      puts("\nSERVER - 3 - request to delete User");
+      deleteUser(userId, userList);
+      break;
+    case '4':
+      puts("\nSERVER - 4 - request to take/send Messages");
+      takeMessages(userId, userList);
+      break;
+    case '5':
+      puts("\nSERVER - 5 - request to check Messages");
+      checkMessage(userId, userList);
+      break;
+    default:
+      break;
     }
+
+    // if (strncmp(buffer, "takeContacts", 12) == 0) {
+    //   char userId[4];
+    //   int pos = 13;
+    //   strncpy(userId, buffer + (pos - 1), 3);
+    //   // take the user id from the buffer
+    //   sendContacts(userId, userList);
+    // } else if (strncmp(buffer, "addUser", 7) == 0) {
+    //   addUser(userId, userList);
+    // } else if (strncmp(buffer, "deleteUser", 10) == 0) {
+
+    // } else if (strncmp(buffer, "sendMessages", 12) == 0) {
+
+    // } else if (strncmp(buffer, "checkMessages", 13) == 0) {
+    // }
 
     // if (strcmp(buffer, "send") == 0) {
     //   // If the command is "send," send a message to the client
@@ -164,7 +195,8 @@ void handleClient(int client_socket, User **userList, char userId[4]) {
     close(client_socket);
   }
 }
-void sendContacts(char userId[4], User **userList) {
+void sendContacts(char userId[4], User **userList, int client_socket) {
+  const char *message = "Hello from the server for sending contacts!";
   char delimiterContact = ':';
   char delimeterFields = '_';
 
@@ -189,9 +221,9 @@ void sendContacts(char userId[4], User **userList) {
     }
   } else {
     // there is no record
-    printf("There is no user");
+    puts("There is no user");
   }
-
+  send(client_socket, message, strlen(message), 0);
   return;
 }
 
