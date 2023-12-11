@@ -196,13 +196,15 @@ void handleClient(int client_socket, User **userList, char userId[4]) {
   }
 }
 void sendContacts(char userId[4], User **userList, int client_socket) {
-  const char *message = "Hello from the server for sending contacts!";
+  char message[MAX_BUFFER_SIZE];
   char delimiterContact = ':';
   char delimeterFields = '_';
+  
 
   User *currentUser = *userList;
   if (currentUser != NULL) {
     // there is already record
+    strcpy(message, "The user is present!");
     bool foundClient = false;
     while (currentUser->nextUser != NULL) {
       if (strcmp(currentUser->userId, userId) == 0) {
@@ -221,7 +223,9 @@ void sendContacts(char userId[4], User **userList, int client_socket) {
     }
   } else {
     // there is no record
+    strcpy(message, "There is no user as such!");
     puts("There is no user");
+  
   }
   send(client_socket, message, strlen(message), 0);
   return;
