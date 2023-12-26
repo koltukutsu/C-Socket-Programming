@@ -31,7 +31,23 @@ int main(int argc, char *argv[]) {
     return 32;
   } else {
     printf("%s\n", argv[1]);
-    strcpy(userId, argv[1]);
+    if(strlen(argv[1])== 2) {
+      userId[0] = '0';
+      userId[1] = argv[1][0];
+      userId[2] = argv[1][1];
+      userId[3] = '\0';
+    } else if(strlen(argv[1])== 1) {
+      userId[0] = '0';
+      userId[1] = '0';
+      userId[2] = argv[1][0];
+      userId[3] = '\0';
+    } else {
+      userId[0] = argv[1][0];
+      userId[1] = argv[1][1];
+      userId[2] = argv[1][2];
+      userId[3] = '\0';
+    }
+    // strcpy(userId, argv[1]);
     printf("CLIENT %s - Assigned User ID: %s\n", userId, userId);
   }
   // Create a socket
