@@ -8,7 +8,7 @@
 #include <pthread.h>
 
 #define SERVER_IP "127.0.0.1"
-#define PORT 9001
+#define PORT 9000
 #define MAX_BUFFER_SIZE 1024
 
 typedef struct client_t
