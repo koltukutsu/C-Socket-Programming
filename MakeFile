@@ -1,6 +1,8 @@
 CC = gcc
 CFLAGS = -Wall
 
+all: server client
+
 server: server.c
 	$(CC) $(CFLAGS) -pthread -o server server.c
 
