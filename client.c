@@ -1,14 +1,18 @@
+// Network
 #include <arpa/inet.h>
+
+// Standard Library
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+// Threading
 #include <pthread.h>
 
 #define SERVER_IP "127.0.0.1"
-#define PORT 9000
+#define PORT 9005
 #define MAX_BUFFER_SIZE 1024
 
 typedef struct client_t

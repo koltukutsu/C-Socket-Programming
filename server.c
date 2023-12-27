@@ -1,15 +1,24 @@
+// Network
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/socket.h>
+
+// System
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <unistd.h>
+
+// Threading
 #include <pthread.h>
+
+// Standard Library
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
 
-#define PORT 9000
+#define PORT 9005
 #define MAX_BUFFER_SIZE 1024
 
 // messages
@@ -42,14 +51,26 @@ typedef struct server_t {
   User **userList;
 } server_t;
 
+//// Handle Operations
 void *handleClient(void *args);
-bool checkUserExists(char userId[4], User **userList);
+
+//// Menu Operations
 void sendContacts(char *userId, User **userList, int client_socket);
 void addUser(char userId[4], User **userList);
 void deleteUser(char userId[4], User **userList);
 void takeMessages(char userId[4], User **userList);
 void checkMessage(char userId[4], User **userList);
+
+//// User Operations
+bool checkUserExists(char userId[4], User **userList);
 void printAllUsers(User *userList);
+
+//// FILE & FOLDER Operations
+void addMessageToFile(char userId[4], char *message);
+void addContactToFile(char userId[4], char *contactInfo);
+void deleteContactFromFile(char userId[4], char *contactId);
+
+
 int main() {
   int server_socket, client_socket;
   struct sockaddr_in server_address, client_address;
@@ -112,6 +133,7 @@ int main() {
   return 0;
 }
 
+//// Handle Operations
 void *handleClient(void *args) {
   char userId[4];
   char buffer[MAX_BUFFER_SIZE];
@@ -187,19 +209,7 @@ void *handleClient(void *args) {
   free(serverInfo);
 }
 
-bool checkUserExists(char userId[4], User **userList) {
-  User *currentUser = *userList;
-  while (currentUser != NULL) {
-    if (strcmp(currentUser->userId, userId) == 0) {
-      // User exists
-      return true;
-    }
-    currentUser = currentUser->nextUser;
-  }
-  // User not found
-  return false;
-}
-
+//// Menu Operations
 void sendContacts(char userId[4], User **userList, int client_socket) {
   // Search for the user with the specified userId
   User *currentUser = *userList;
@@ -246,30 +256,69 @@ void sendContacts(char userId[4], User **userList, int client_socket) {
 }
 
 void addUser(char userId[4], User **userList) {
-  User *newUser = (User *)malloc(sizeof(User));
-  if (newUser == NULL) {
-    perror("Error allocating memory for new user");
-    exit(EXIT_FAILURE);
-  }
-
-  // Initialize the new user's fields
-  strncpy(newUser->userId, userId, sizeof(newUser->userId));
-  newUser->userId[sizeof(newUser->userId) - 1] = '\0';
-  newUser->contactsList = NULL; // Initialize the contacts list to be empty
-  newUser->nextUser = NULL;
-
-  if (*userList == NULL) {
-    // If the user list is empty, set the new user as the head of the list
-    *userList = newUser;
-  } else {
-    // Find the last user in the list and append the new user to it
-    User *lastUser = *userList;
-    while (lastUser->nextUser != NULL) {
-      lastUser = lastUser->nextUser;
+    User *newUser = (User *)malloc(sizeof(User));
+    if (newUser == NULL) {
+        perror("Error allocating memory for new user");
+        exit(EXIT_FAILURE);
     }
-    lastUser->nextUser = newUser;
-  }
+
+    // Initialize the new user's fields
+    strncpy(newUser->userId, userId, sizeof(newUser->userId));
+    newUser->userId[sizeof(newUser->userId) - 1] = '\0';
+    newUser->contactsList = NULL; // Initialize the contacts list to be empty
+    newUser->nextUser = NULL;
+
+    if (*userList == NULL) {
+        // If the user list is empty, set the new user as the head of the list
+        *userList = newUser;
+    } else {
+        // Find the last user in the list and append the new user to it
+        User *lastUser = *userList;
+        while (lastUser->nextUser != NULL) {
+            lastUser = lastUser->nextUser;
+        }
+        lastUser->nextUser = newUser;
+    }
+
+    // Create a 'database' directory if it doesn't exist
+    char databaseFolder[] = "./database";
+    if (mkdir(databaseFolder, 0755) != 0) {
+        if (errno != EEXIST) {
+            perror("Error creating database directory");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Create a directory for the new user inside the 'database' folder
+    char userFolder[50]; // Adjust the buffer size as needed
+    snprintf(userFolder, sizeof(userFolder), "%s/user_%s", databaseFolder, userId);
+    if (mkdir(userFolder, 0755) != 0) {
+        if (errno != EEXIST) {
+            perror("Error creating user directory");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Create files for messages and contacts in the user's directory
+    char messagesFilePath[70], contactsFilePath[70];
+    snprintf(messagesFilePath, sizeof(messagesFilePath), "%s/messages.txt", userFolder);
+    snprintf(contactsFilePath, sizeof(contactsFilePath), "%s/contacts.txt", userFolder);
+
+    FILE *messagesFile = fopen(messagesFilePath, "w");
+    if (messagesFile == NULL) {
+        perror("Error creating messages file");
+        exit(EXIT_FAILURE);
+    }
+    fclose(messagesFile);
+
+    FILE *contactsFile = fopen(contactsFilePath, "w");
+    if (contactsFile == NULL) {
+        perror("Error creating contacts file");
+        exit(EXIT_FAILURE);
+    }
+    fclose(contactsFile);
 }
+
 
 void deleteUser(char userId[4], User **userList) {
 
@@ -351,6 +400,8 @@ void checkMessage(char userId[4], User **userList) {
     printf("There is no user");
   }
 }
+
+//// User Operations
 void printAllUsers(User *userList) {
   User *currentUser = userList;
 
@@ -360,4 +411,78 @@ void printAllUsers(User *userList) {
     printf("User ID: %s\n", currentUser->userId);
     currentUser = currentUser->nextUser;
   }
+}
+
+
+bool checkUserExists(char userId[4], User **userList) {
+  User *currentUser = *userList;
+  while (currentUser != NULL) {
+    if (strcmp(currentUser->userId, userId) == 0) {
+      // User exists
+      return true;
+    }
+    currentUser = currentUser->nextUser;
+  }
+  // User not found
+  return false;
+}
+
+//// FILE & FOLDER Operations
+void addMessageToFile(char userId[4], char *message) {
+    char messagesFilePath[70];
+    snprintf(messagesFilePath, sizeof(messagesFilePath), "./database/user_%s/messages.txt", userId);
+
+    FILE *messagesFile = fopen(messagesFilePath, "a");
+    if (messagesFile == NULL) {
+        perror("Error opening messages file");
+        exit(EXIT_FAILURE);
+    }
+
+    fprintf(messagesFile, "%s\n", message);
+    fclose(messagesFile);
+}
+
+void addContactToFile(char userId[4], char *contactInfo) {
+    char contactsFilePath[70];
+    snprintf(contactsFilePath, sizeof(contactsFilePath), "./database/user_%s/contacts.txt", userId);
+
+    FILE *contactsFile = fopen(contactsFilePath, "a");
+    if (contactsFile == NULL) {
+        perror("Error opening contacts file");
+        exit(EXIT_FAILURE);
+    }
+
+    fprintf(contactsFile, "%s\n", contactInfo);
+    fclose(contactsFile);
+}
+
+void deleteContactFromFile(char userId[4], char *contactId) {
+    char contactsFilePath[70];
+    snprintf(contactsFilePath, sizeof(contactsFilePath), "./database/user_%s/contacts.txt", userId);
+
+    // Temporary file to store updated contacts
+    char tempFilePath[70];
+    snprintf(tempFilePath, sizeof(tempFilePath), "%s.temp", contactsFilePath);
+
+    FILE *contactsFile = fopen(contactsFilePath, "r");
+    FILE *tempFile = fopen(tempFilePath, "w");
+
+    if (contactsFile == NULL || tempFile == NULL) {
+        perror("Error opening files");
+        exit(EXIT_FAILURE);
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), contactsFile) != NULL) {
+        if (strstr(line, contactId) == NULL) {
+            fputs(line, tempFile);
+        }
+    }
+
+    fclose(contactsFile);
+    fclose(tempFile);
+
+    // Replace old contacts file with new temp file
+    remove(contactsFilePath);
+    rename(tempFilePath, contactsFilePath);
 }
