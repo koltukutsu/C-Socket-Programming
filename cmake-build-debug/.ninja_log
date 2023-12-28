@@ -1,0 +1,9 @@
+# ninja log v5
+0	46	1703772359153989461	CMakeFiles/C_Socket_Programming.dir/server.c.o	62b84bf65b1041b1
+46	60	1703772359165989480	C_Socket_Programming	63fb5c9088877f45
+1	45	1703772918858971268	CMakeFiles/C_Socket_Programming.dir/server.c.o	62b84bf65b1041b1
+45	58	1703772918874971328	C_Socket_Programming	63fb5c9088877f45
+0	45	1703773143699731843	CMakeFiles/C_Socket_Programming.dir/server.c.o	62b84bf65b1041b1
+45	58	1703773143711731878	C_Socket_Programming	63fb5c9088877f45
+0	43	1703773350124316432	CMakeFiles/C_Socket_Programming.dir/server.c.o	62b84bf65b1041b1
+43	56	1703773350140316474	C_Socket_Programming	63fb5c9088877f45

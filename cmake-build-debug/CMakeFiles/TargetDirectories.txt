@@ -1,0 +1,3 @@
+/home/semih/dev/C-Socket-Programming/cmake-build-debug/CMakeFiles/C_Socket_Programming.dir
+/home/semih/dev/C-Socket-Programming/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/semih/dev/C-Socket-Programming/cmake-build-debug/CMakeFiles/rebuild_cache.dir

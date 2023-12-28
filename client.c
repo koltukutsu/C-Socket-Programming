@@ -12,8 +12,16 @@
 #include <pthread.h>
 
 #define SERVER_IP "127.0.0.1"
-#define PORT 9005
+#define PORT 3013
 #define MAX_BUFFER_SIZE 1024
+
+typedef struct {
+    char id[10];
+    char name[30];
+    char surname[15];
+    char phone[14];
+} UserInfo;
+
 
 typedef struct client_t
 {
@@ -25,11 +33,14 @@ int showMenu();
 // void sendUserId(int client_socket, char userId[4]);
 void *receive_messages(void *arg);
 void userChoiceOperations(int choice, int client_socket, char userId[4]);
+//// MENU Operations
 void getContacts(char userId[4], int client_socket);
 void addUser(char userId[4], int client_socket);
 void deleteUser(char userId[4], int client_socket);
 void sendMessages(char userId[4], int client_socket);
 void checkMessages(char userId[4], int client_socket);
+//// UTILS
+void promptForUserInfo(UserInfo *userInfo);
 
 int main(int argc, char *argv[])
 {
@@ -100,11 +111,11 @@ int main(int argc, char *argv[])
   }
 
   // Create a thread for receiving messages from the server
-  if (pthread_create(&recv_thread, NULL, receive_messages, &client_socket) != 0)
-  {
-    perror("Thread creation failed");
-    exit(EXIT_FAILURE);
-  }
+//  if (pthread_create(&recv_thread, NULL, receive_messages, &client_socket) != 0)
+//  {
+//    perror("Thread creation failed");
+//    exit(EXIT_FAILURE);
+//  }
 
   do
   {
@@ -147,18 +158,18 @@ int showMenu()
 
 void *receive_messages(void *arg)
 {
-  int client_socket = *(int *)arg;
-  char buffer[MAX_BUFFER_SIZE];
-  while (1)
-  {
-    memset(buffer, 0, sizeof(buffer));
-    if (recv(client_socket, buffer, sizeof(buffer), 0) <= 0)
-    {
-      perror("Server disconnected.");
-      exit(EXIT_FAILURE);
-    }
-    printf("Server: %s\n", buffer);
-  }
+//  int client_socket = *(int *)arg;
+//  char buffer[MAX_BUFFER_SIZE];
+//  while (1)
+//  {
+//    memset(buffer, 0, sizeof(buffer));
+//    if (recv(client_socket, buffer, sizeof(buffer), 0) <= 0)
+//    {
+//      perror("Server disconnected.");
+//      exit(EXIT_FAILURE);
+//    }
+//    printf("Server: %s\n", buffer);
+//  }
 }
 
 //   // server response
@@ -210,73 +221,64 @@ void userChoiceOperations(int choice, int client_socket, char userId[4])
 }
 //// MENU
 // 1. get contacts
-void getContacts(char userId[4], int client_socket)
-{
-  char command[MAX_BUFFER_SIZE];
-  strcpy(command, userId);
-  strcat(command, ":1");
-  puts("\nCLIENT - get contacts: ");
-  puts(command);
-  send(client_socket, command, strlen(command), 0);
+void getContacts(char userId[4], int client_socket) {
+    char command[MAX_BUFFER_SIZE];
+    strcpy(command, userId);
+    strcat(command, ":1");
+    puts("\nCLIENT - get contacts: ");
+    puts(command);
+    send(client_socket, command, strlen(command), 0);
 
-  // server response
-  char buffer[MAX_BUFFER_SIZE];
-  ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
-  if (received_bytes > 0)
-  {
-    buffer[received_bytes] = '\0'; // Null-terminate the received data
-    printf("Server response: %s\n", buffer);
-  }
-  else
-  {
-    perror("Error receiving data from server");
-  }
+    // server response
+    char buffer[MAX_BUFFER_SIZE];
+    ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+    if (received_bytes > 0) {
+        buffer[received_bytes] = '\0'; // Null-terminate the received data
+        printf("Server response: %s\n", buffer);
+
+        // Check if the response is a user not found message
+        if (strstr(buffer, "User ") && strstr(buffer, " not found")) {
+            printf("Error: %s\n", buffer);
+        } else {
+            // Process the response and print each contact
+            char *token = strtok(buffer, "_");
+            while (token != NULL) {
+                char contactId[10], phoneNumber[14], name[30], surname[15];
+                if (sscanf(token, "%9[^:]:%13[^:]:%29[^:]:%14[^:]", contactId, phoneNumber, name, surname) == 4) {
+                    printf("Contact ID: %s, Phone: %s, Name: %s %s\n", contactId, phoneNumber, name, surname);
+                } else {
+                    printf("Invalid contact format: %s\n", token);
+                }
+                token = strtok(NULL, "_");
+            }
+        }
+    } else {
+        perror("Error receiving data from server");
+    }
 }
+
 // 2. add user
-void addUser(char userId[4], int client_socket)
-{
-  // char *command = "addUser:userId";
-  char message[MAX_BUFFER_SIZE];
-  char id[10];
-  char name[15];
-  char surname[15];
-  char phone[14];
-  strcpy(message, userId);
-  strcat(message, ":2:");
-  printf("\nEnter ID MobilePhone Name Surname, in order: ");
-  printf("\nID: ");
-  scanf("%s", id);
-  printf("\nName: ");
-  scanf("%s", name);
-  printf("\nSurname: ");
-  scanf("%s", surname);
-  printf("\nPhone: ");
-  scanf("%s", phone);
+void addUser(char userId[4], int client_socket) {
+    UserInfo userInfo;
+    promptForUserInfo(&userInfo);
 
-  strcat(message, id);
-  strcat(message, "_");
-  strcat(message, phone);
-  strcat(message, "_");
-  strcat(message, name);
-  strcat(message, "_");
-  strcat(message, surname);
+    char message[MAX_BUFFER_SIZE];
+    snprintf(message, MAX_BUFFER_SIZE, "%s:2:%s_%s_%s_%s", userId, userInfo.id, userInfo.phone, userInfo.name, userInfo.surname);
 
-  message[strcspn(message, "\n")] = '\0'; // Remove newline character
-  printf("Client - ADD User: %s", message);
-  send(client_socket, message, strlen(message), 0);
-
-  // server response
-  char buffer[MAX_BUFFER_SIZE];
-  ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
-  if (received_bytes > 0)
-  {
-    buffer[received_bytes] = '\0'; // Null-terminate the received data
-    printf("Server response: %s\n", buffer);
-  }
-  else
-  {
-    perror("Error receiving data from server");
-  }
+    printf("Client - ADD User: %s\n", message);
+    if (send(client_socket, message, strlen(message), 0) < 0) {
+        perror("Error sending data to server");
+        return;
+    }
+    printf("Client - Now waiting for the server response...\n");
+    char buffer[MAX_BUFFER_SIZE];
+    ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+    if (received_bytes > 0) {
+        buffer[received_bytes] = '\0'; // Null-terminate the received data
+        printf("Server response: %s\n", buffer);
+    } else {
+        perror("Error receiving data from server");
+    }
 }
 // 3. delete user
 void deleteUser(char userId[4], int client_socket)
@@ -343,4 +345,29 @@ void checkMessages(char userId[4], int client_socket)
   {
     perror("Error receiving data from server");
   }
+}
+
+//// Utils
+void promptForUserInfo(UserInfo *userInfo) {
+    printf("\nEnter ID, Mobile Phone, Name, Surname, in order:\n");
+
+    printf("ID: ");
+    scanf("%9s", userInfo->id);
+    // Clear the input buffer
+    while (getchar() != '\n');
+
+    printf("Phone: ");
+    scanf("%13s", userInfo->phone);
+    // Clear the input buffer
+    while (getchar() != '\n');
+
+    printf("Name: ");
+    // Read up to 29 characters until a newline is encountered
+    scanf("%29[^\n]", userInfo->name);
+    // Clear the input buffer
+    while (getchar() != '\n');
+
+    printf("Surname: ");
+    // Read up to 14 characters until a newline is encountered
+    scanf("%14[^\n]", userInfo->surname);
 }
