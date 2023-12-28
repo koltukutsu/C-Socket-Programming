@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PORT 3015
+#define PORT 8004
 #define MAX_BUFFER_SIZE 1024
 
 pthread_mutex_t userList_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -36,7 +36,7 @@ typedef struct contact {
     char phoneNumber[14];
     char name[30];
     char surname[15];
-    Message *messagesList;
+//    Message *messagesList;
     struct contact *nextContact;
 } Contact;
 
@@ -44,7 +44,7 @@ typedef struct contact {
 typedef struct user {
     char userId[4];
     Contact *contactsList;
-
+    Message *messagesList;
     struct user *nextUser;
 } User;
 
@@ -69,13 +69,16 @@ void *handleClient(void *args);
 void sendContacts(char *userId, User **userList, int client_socket);
 
 void
-addUserToContact(char userId[4], User **userList, int client_socket, int received_bytes, char buffer[MAX_BUFFER_SIZE]);
+addUserToContact(char userId[4], User **userList, int client_socket, ssize_t received_bytes,
+                 char buffer[MAX_BUFFER_SIZE]);
 
-void deleteUser(char userId[4], User **userList, int client_socket);
+void
+deleteUser(char userId[4], User **userList, int client_socket, ssize_t received_bytes, char buffer[MAX_BUFFER_SIZE]);
 
-void takeMessages(char userId[4], User **userList, int client_socket);
+void
+takeMessages(char userId[4], User **userList, int client_socket, ssize_t received_bytes, char buffer[MAX_BUFFER_SIZE]);
 
-void checkMessage(char userId[4], User **userList, int client_socket);
+void checkMessages(char userId[4], User **userList, int client_socket);
 
 //// User Operations
 void printContactInfo(const char *contactId, const char *phoneNumber, const char *name, const char *surname);
@@ -85,6 +88,10 @@ bool checkUserExists(char userId[4], User **userList);
 void printAllUsers(User *userList);
 
 void createNewUser(char userId[4], User **userList);
+
+char *formatUserIdOneInput(const char *input);
+
+void formatUserId(char *input, char *userId);
 
 //// FILE & FOLDER Operations
 void addMessageToFile(char userId[4], char *message);
@@ -137,8 +144,10 @@ int main() {
         close(server_socket);
         exit(EXIT_FAILURE);
     }
+    // loads the database from the local files
     loadDatabase(&userList);
-    printf("Server listening on port: %d\n", PORT);
+
+    printf("\n SERVER - Server listening on port: %d\n", PORT);
 
     while (1) {
         // Accept a connection
@@ -227,7 +236,9 @@ void *handleClient(void *args) {
                 pthread_mutex_unlock(&userList_mutex);
 
             }
-
+            // If it enters here, the mod and the userID is already given
+            // so there is already a buffer present here
+            // and client wants a response from the server...
             switch (mode) {
                 case '1':
                     puts("\nSERVER - 1 - request to send Contacts");
@@ -239,15 +250,15 @@ void *handleClient(void *args) {
                     break;
                 case '3':
                     puts("\nSERVER - 3 - request to delete User");
-                    deleteUser(userId, serverInfo->userList, serverInfo->client_socket);
+                    deleteUser(userId, serverInfo->userList, serverInfo->client_socket, received_bytes, buffer);
                     break;
                 case '4':
                     puts("\nSERVER - 4 - request to take/send Messages");
-                    takeMessages(userId, serverInfo->userList, serverInfo->client_socket);
+                    takeMessages(userId, serverInfo->userList, serverInfo->client_socket, received_bytes, buffer);
                     break;
                 case '5':
                     puts("\nSERVER - 5 - request to check Messages");
-                    checkMessage(userId, serverInfo->userList, serverInfo->client_socket);
+                    checkMessages(userId, serverInfo->userList, serverInfo->client_socket);
                     break;
                 case '6':
                     puts("\nSERVER - 6 - request to close client");
@@ -326,7 +337,8 @@ void sendContacts(char userId[4], User **userList, int client_socket) {
 // Client -> 2. add contact
 
 void
-addUserToContact(char userId[4], User **userList, int client_socket, int received_bytes, char buffer[MAX_BUFFER_SIZE]) {
+addUserToContact(char userId[4], User **userList, int client_socket, ssize_t received_bytes,
+                 char buffer[MAX_BUFFER_SIZE]) {
     pthread_mutex_lock(&userList_mutex);
 //    char buffer[MAX_BUFFER_SIZE];
 //    ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
@@ -408,7 +420,8 @@ addUserToContact(char userId[4], User **userList, int client_socket, int receive
 }
 
 // Client -> 3. delete contact
-void deleteUser(char userId[4], User **userList, int client_socket) {
+void
+deleteUser(char userId[4], User **userList, int client_socket, ssize_t received_bytes, char buffer[MAX_BUFFER_SIZE]) {
     pthread_mutex_lock(&userList_mutex);
     User *currentUser = *userList;
     if (currentUser != NULL) {
@@ -437,60 +450,155 @@ void deleteUser(char userId[4], User **userList, int client_socket) {
 }
 
 // Client -> 4. take messages
-void takeMessages(char userId[4], User **userList, int client_socket) {
+void
+takeMessages(char userId[4], User **userList, int client_socket, ssize_t received_bytes, char buffer[MAX_BUFFER_SIZE]) {
     pthread_mutex_lock(&userList_mutex);
+//    char buffer[MAX_BUFFER_SIZE];
+//    recv(client_socket, buffer, sizeof(buffer), 0);
+
+    char *token;
+    char recipientId[4];
+
+    // First call to strtok gets the first part (userID)
+    token = strtok(buffer, ":");
+    if (token != NULL) {
+        // Second call to strtok gets the mode (which is '4' in this case)
+        token = strtok(NULL, ":");
+    }
+
+    if (token != NULL) {
+        // Third call to strtok gets the recipient's user ID
+        token = strtok(NULL, ":");
+        if (token != NULL) {
+            strncpy(recipientId, token, sizeof(recipientId) - 1);
+            recipientId[sizeof(recipientId) - 1] = '\0'; // Ensure null-termination
+        }
+    }
+    // control whether the contact id is in the contact list of the current user
+    bool isRecipientExists = false;
     User *currentUser = *userList;
-    if (currentUser != NULL) {
-        // there is already record
-        bool foundClient = false;
-        while (currentUser->nextUser != NULL) {
-            if (strcmp(currentUser->userId, userId) == 0) {
-                foundClient = true;
-            } else {
-                currentUser = currentUser->nextUser;
+    bool flag = true;
+    while (currentUser != NULL && flag) {
+        if (strcmp(currentUser->userId, userId) == 0) {
+            Contact *currentContact = currentUser->contactsList;
+            int flag2 = true;
+            while (currentContact != NULL && flag2) {
+                if (strcmp(currentContact->contactUserId, recipientId) == 0) {
+                    isRecipientExists = true;
+                    flag2 = false;
+                }
+                currentContact = currentContact->nextContact;
             }
+            flag = false;
         }
-        // the client is saved
-        if (foundClient) {
-            // add the user
-            Contact *contactsList = currentUser->contactsList;
-        } else {
-            User *user = (User *) malloc(sizeof(User));
-            currentUser->nextUser = user;
+        currentUser = currentUser->nextUser;
+    }
+    if (isRecipientExists) {
+        // Recipient found. Send acknowledgment and receive message
+        char ack[] = "Recipient found";
+        puts("\t\tSent the message, waiting client response...");
+        send(client_socket, ack, strlen(ack), 0);
+
+        puts("\t\tGet the message, continuing...");
+        // Receive the message from the client
+        char messageBuffer[MAX_BUFFER_SIZE];
+        ssize_t receivedBytesMessage = recv(client_socket, messageBuffer, sizeof(messageBuffer), 0);
+
+        if (receivedBytesMessage < 0) {
+            perror("Error receiving data from client");
+            pthread_mutex_unlock(&userList_mutex);
+            return;
         }
+
+        messageBuffer[receivedBytesMessage] = '\0'; // Ensure null-termination
+        strcpy(recipientId, formatUserIdOneInput(recipientId));
+//        formatUserId(recipientId, recipientId);
+
+        // TODO: Add the message to the recipient's messages list
+        // A recipient is found with the recipientId, so the message is added to the recipient's message list.
+        User *recipientUser = *userList;
+        bool flagOut = false;
+        while (recipientUser != NULL && !flagOut) {
+            puts("\n comparison");
+            puts(recipientUser->userId);
+            puts(recipientId);
+            if (strcmp(recipientUser->userId, recipientId) == 0) {
+                // Found the recipient user
+                Message *newMessage = (Message *) malloc(sizeof(Message));
+                if (newMessage == NULL) {
+                    // Handle memory allocation error
+                    perror("Error allocating memory for new message");
+                    flagOut = true;
+                } else {
+                    // Copy the message details to the new message node
+                    strncpy(newMessage->correspondentId, userId, sizeof(newMessage->correspondentId) - 1);
+                    newMessage->correspondentId[sizeof(newMessage->correspondentId) - 1] = '\0';
+                    strncpy(newMessage->message, messageBuffer, sizeof(newMessage->message) - 1);
+                    newMessage->message[sizeof(newMessage->message) - 1] = '\0';
+
+                    // Insert the new message at the beginning of the recipient's messages list
+                    newMessage->nextMessage = recipientUser->messagesList;
+                    recipientUser->messagesList = newMessage;
+
+                    // Acknowledge that the message has been added
+                    char confirmMsg[] = "Message added successfully";
+                    send(client_socket, confirmMsg, strlen(confirmMsg), 0);
+                    flagOut = true;
+                }
+
+
+            } else {
+                puts("Recipient not found");
+
+            }
+            recipientUser = recipientUser->nextUser;
+        }
+
     } else {
-        // there is no record
-        printf("There is no user");
+        // Recipient not found in contact list
+        char errorMsg[] = "Recipient not found";
+        send(client_socket, errorMsg, strlen(errorMsg), 0);
     }
     pthread_mutex_unlock(&userList_mutex);
 }
 
 //  Client -> 5. check messages
-void checkMessage(char userId[4], User **userList, int client_socket) {
+void checkMessages(char userId[4], User **userList, int client_socket) {
     pthread_mutex_lock(&userList_mutex);
+
+    // Find the user in the userList
     User *currentUser = *userList;
-    if (currentUser != NULL) {
-        // there is already record
-        bool foundClient = false;
-        while (currentUser->nextUser != NULL) {
-            if (strcmp(currentUser->userId, userId) == 0) {
-                foundClient = true;
-            } else {
-                currentUser = currentUser->nextUser;
-            }
-        }
-        // the client is saved
-        if (foundClient) {
-            // add the user
-            Contact *contactsList = currentUser->contactsList;
-        } else {
-            User *user = (User *) malloc(sizeof(User));
-            currentUser->nextUser = user;
-        }
-    } else {
-        // there is no record
-        printf("There is no user");
+    while (currentUser != NULL && strcmp(currentUser->userId, userId) != 0) {
+        currentUser = currentUser->nextUser;
     }
+
+    if (currentUser == NULL) {
+        char *msg = "User not found\n";
+        send(client_socket, msg, strlen(msg), 0);
+    } else {
+        // Iterate through the user's messages and collect unique sender IDs
+        char senders[MAX_BUFFER_SIZE] = {0};
+        Message *message = currentUser->messagesList;
+        if (message != NULL) {
+            // there are messages
+            while (message != NULL) {
+                if (strstr(senders, message->correspondentId) == NULL) {
+                    strcat(senders, message->correspondentId);
+                    strcat(senders, "\n");
+                }
+                message = message->nextMessage;
+            }
+
+            // Send the list of senders back to the client
+            send(client_socket, senders, strlen(senders), 0);
+
+        } else {
+            // there is no message
+            char *msg = "No message";
+            send(client_socket, msg, strlen(msg), 0);
+        }
+    }
+
     pthread_mutex_unlock(&userList_mutex);
 }
 
@@ -502,10 +610,9 @@ void printContactInfo(const char *contactId, const char *phoneNumber, const char
 void printAllUsers(User *userList) {
     User *currentUser = userList;
 
-    printf("List of all users:\n");
-
+    printf("\033[32m\nList of all users:\n\033[0m");
     while (currentUser != NULL) {
-        printf("User ID: %s\n", currentUser->userId);
+        printf("\tUser ID: %s\n", currentUser->userId);
         currentUser = currentUser->nextUser;
     }
 }
@@ -541,6 +648,7 @@ void createNewUser(char userId[4], User **userList) {
     strncpy(newUser->userId, userId, sizeof(newUser->userId));
     newUser->userId[sizeof(newUser->userId) - 1] = '\0';
     newUser->contactsList = NULL; // Initialize the contacts list to be empty
+    newUser->messagesList = NULL; // Initialize the messages list to be empty
     newUser->nextUser = NULL;
 
     if (*userList == NULL) {
@@ -597,6 +705,46 @@ void createNewUser(char userId[4], User **userList) {
     }
     fclose(contactsFile);
     pthread_mutex_unlock(&userList_mutex);
+}
+
+char *formatUserIdOneInput(const char *input) {
+    char *userId = malloc(4 * sizeof(char));  // Allocate memory for userId
+    if (!userId) {
+        perror("Memory allocation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    if (strlen(input) == 2) {
+        userId[0] = '0';
+        userId[1] = input[0];
+        userId[2] = input[1];
+    } else if (strlen(input) == 1) {
+        userId[0] = '0';
+        userId[1] = '0';
+        userId[2] = input[0];
+    } else {
+        strncpy(userId, input, 3);  // Copy first 3 characters
+    }
+    userId[3] = '\0';  // Ensure string is null-terminated
+
+    return userId;
+}
+
+void formatUserId(char *input, char *userId) {
+    if (strlen(input) == 2) {
+        userId[0] = '0';
+        userId[1] = input[0];
+        userId[2] = input[1];
+    } else if (strlen(input) == 1) {
+        userId[0] = '0';
+        userId[1] = '0';
+        userId[2] = input[0];
+    } else {
+        userId[0] = input[0];
+        userId[1] = input[1];
+        userId[2] = input[2];
+    }
+    userId[3] = '\0';  // Ensure string is null-terminated
 }
 
 //// FILE & FOLDER Operations
@@ -661,26 +809,26 @@ void deleteContactFromFile(char userId[4], char *contactId) {
 
 //// Starting Operations
 void loadContactsFromFile(const char *filePath, Contact **contactsList) {
+    printf("\n\t\tCONTACTS:");
     FILE *file = fopen(filePath, "r");
     if (!file) {
         perror("Error opening contacts file");
         return;
     }
 
-    // Additional check to see if the file is empty
-    fseek(file, 0, SEEK_END); // Go to end of file
-    if (ftell(file) == 0) {
-        printf("File is empty: %s\n", filePath);
-        fclose(file);
-        return;
-    }
-    rewind(file);
+    // Check if the file is empty
+//    fseek(file, 0, SEEK_END); // Go to end of file
+//    if (ftell(file) == 0) {
+//        printf("\nFile is empty: %s", filePath);
+//        fclose(file);
+//        return;
+//    }
+//    rewind(file);
 
     char line[256];
     bool isEmpty = true; // Flag to check if the file is empty
-    char *readSuccess;
 
-    while ((readSuccess = fgets(line, sizeof(line), file)) != NULL) {
+    while (fgets(line, sizeof(line), file) != NULL) {
         isEmpty = false; // File has content
 
         Contact *newContact = (Contact *) malloc(sizeof(Contact));
@@ -694,21 +842,22 @@ void loadContactsFromFile(const char *filePath, Contact **contactsList) {
                newContact->contactUserId, newContact->phoneNumber,
                newContact->name, newContact->surname);
 
-        newContact->messagesList = NULL; // Initialize with no messages
         newContact->nextContact = *contactsList; // Add to the front of the contacts list
         *contactsList = newContact;
+        printf("\n\t\t\tContact ID: %s, Phone Number: %s, Name: %s, Surname: %s",
+               newContact->contactUserId, newContact->phoneNumber,
+               newContact->name, newContact->surname);
     }
 
     if (isEmpty) {
-        // Handle empty file situation if needed
-        printf("No contacts found in file: %s\n", filePath);
+        printf("\n\t\t\tNo contacts found in file: %s", filePath);
     }
 
     fclose(file);
-
 }
 
 void loadMessagesFromFile(const char *filePath, Message **messagesList) {
+    printf("\n\t\tMESSAGES:");
     FILE *file = fopen(filePath, "r");
     if (!file) {
         perror("Error opening messages file");
@@ -730,10 +879,11 @@ void loadMessagesFromFile(const char *filePath, Message **messagesList) {
         sscanf(line, "%3[^:]:%254[^\n]", newMessage->correspondentId, newMessage->message);
         newMessage->nextMessage = *messagesList;
         *messagesList = newMessage;
+        printf("\n\t\t\tCorrespondent ID: %s, Message: %s", newMessage->correspondentId, newMessage->message);
     }
 
     if (isEmpty) {
-        printf("No messages found in file: %s\n", filePath);
+        printf("\n\t\t\tNo messages found in file: %s", filePath);
     }
 
     fclose(file);
@@ -746,26 +896,30 @@ void loadDatabase(User **userList) {
     // Try to open the directory
     dir = opendir("./database");
     if (!dir) {
-        // Notify the user of a fresh start instead of printing an error
-        printf("Server - Notice: This is a fresh start.\n");
+        printf("\033[32mSERVER - Notice: This is a fresh start.\n\033[0m");
         return;
     } else {
-        printf("Server: Database is loading...\n");
+        printf("\033[33mSERVER - Loading: Database is loading...\n\033[0m");
     }
 
     while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type == DT_DIR && strncmp(entry->d_name, "user_", 5) == 0) {
-            char userId[4]; // 3 characters for userId plus null-terminator
-            strncpy(userId, entry->d_name + 5, 3); // Skip "user_" prefix
+            char userId[4];
+            strncpy(userId, entry->d_name + 5, 3);
+
             userId[3] = '\0';
+//            puts("\t\t");
+//            puts(userId);
 
             User *newUser = (User *) malloc(sizeof(User));
             if (newUser == NULL) {
                 perror("Error allocating memory for new user");
                 continue;
             }
-            strncpy(newUser->userId, userId, sizeof(newUser->userId));
+//            strncpy(newUser->userId, userId, sizeof(newUser->userId) - 1);
+            strcpy(newUser->userId, userId);
             newUser->contactsList = NULL;
+            newUser->messagesList = NULL; // Initialize messages list
             newUser->nextUser = *userList;
             *userList = newUser;
 
@@ -773,15 +927,17 @@ void loadDatabase(User **userList) {
             snprintf(contactsFilePath, sizeof(contactsFilePath), "./database/%s/contacts.txt", entry->d_name);
             snprintf(messagesFilePath, sizeof(messagesFilePath), "./database/%s/messages.txt", entry->d_name);
 
-            printFileContents(contactsFilePath);
-            printFileContents(messagesFilePath);
-            printf("\n Contact file path: %s", contactsFilePath);
-            printf("\n Message file path: %s", messagesFilePath);
+//            printFileContents(contactsFilePath);
+//            printFileContents(messagesFilePath);
+            printf("\n\tSERVER - Data of %s", userId);
+//            printf("\n \tContact file path: %s", contactsFilePath);
+//            printf("\n \tMessage file path: %s", messagesFilePath);
             loadContactsFromFile(contactsFilePath, &(newUser->contactsList));
-            loadMessagesFromFile(messagesFilePath, &(newUser->contactsList->messagesList));
+            loadMessagesFromFile(messagesFilePath, &(newUser->messagesList));
             printf("\n");
         }
     }
+    printAllUsers(*userList);
 
     closedir(dir);
 }

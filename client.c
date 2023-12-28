@@ -12,7 +12,7 @@
 #include <pthread.h>
 
 #define SERVER_IP "127.0.0.1"
-#define PORT 3015
+#define PORT 8004
 #define MAX_BUFFER_SIZE 1024
 
 typedef struct {
@@ -48,6 +48,7 @@ void checkMessages(char userId[4], int client_socket);
 
 //// UTILS
 void promptForUserInfo(UserInfo *userInfo);
+void formatUserId(char *input, char *userId);
 
 int main(int argc, char *argv[]) {
     int client_socket;
@@ -63,22 +64,7 @@ int main(int argc, char *argv[]) {
         return 32;
     } else {
         printf("%s\n", argv[1]);
-        if (strlen(argv[1]) == 2) {
-            userId[0] = '0';
-            userId[1] = argv[1][0];
-            userId[2] = argv[1][1];
-            userId[3] = '\0';
-        } else if (strlen(argv[1]) == 1) {
-            userId[0] = '0';
-            userId[1] = '0';
-            userId[2] = argv[1][0];
-            userId[3] = '\0';
-        } else {
-            userId[0] = argv[1][0];
-            userId[1] = argv[1][1];
-            userId[2] = argv[1][2];
-            userId[3] = '\0';
-        }
+        formatUserId(argv[1], userId);
         // strcpy(userId, argv[1]);
         printf("CLIENT %s - Assigned User ID: %s\n", userId, userId);
     }
@@ -303,37 +289,103 @@ void deleteUser(char userId[4], int client_socket) {
 
 // 4. send messages
 void sendMessages(char userId[4], int client_socket) {
-    // client function
-    char command[MAX_BUFFER_SIZE];
-    strcpy(command, userId);
-    strcat(command, ":4:");
-    // server response
+    char recipientId[4];
+
+    printf("Enter recipient's User ID: ");
+    scanf("%3s", recipientId);
+    getchar();  // Clear newline character from the buffer
+
+    //// FIRST
+    // First part: Send the client userID and mode
+    char initialCommand[MAX_BUFFER_SIZE];
+    snprintf(initialCommand, sizeof(initialCommand), "%s:4:%s", userId, recipientId);
+    send(client_socket, initialCommand, strlen(initialCommand), 0);
+    //First Part Server response
     char buffer[MAX_BUFFER_SIZE];
     ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+
     if (received_bytes > 0) {
         buffer[received_bytes] = '\0'; // Null-terminate the received data
-        printf("Server response: %s\n", buffer);
+//        printf("Server response: %s\n", buffer);
+        if(strstr(buffer, "Recipient not found")){
+            printf("\033[31m\tError: %s\n\033[0m", buffer);
+            return;
+        } else {
+            printf("\033[32m\tFound: %s\n\033[0m", buffer);
+        }
     } else {
-        perror("Error receiving data from server");
+        perror("Client - Error receiving data from server");
+        return;
     }
+
+    //// SECOND
+    // third part: send the message
+    char message[255];
+    printf("Enter your message: ");
+    fgets(message, sizeof(message), stdin);
+    message[strcspn(message, "\n")] = 0;  // Remove newline character
+    // third part: Send the message to the recipient
+    char fullMessage[MAX_BUFFER_SIZE];
+    snprintf(fullMessage, sizeof(fullMessage), "%s",message);
+    send(client_socket, fullMessage, strlen(fullMessage), 0);
+
+    char bufferFinal[MAX_BUFFER_SIZE];
+    ssize_t received_bytes_final = recv(client_socket, bufferFinal, sizeof(bufferFinal), 0);
+    if (received_bytes_final > 0) {
+        bufferFinal[received_bytes_final] = '\0'; // Null-terminate the received data
+        printf("Server response: %s\n", bufferFinal);
+    } else {
+        perror("Client - Error receiving data from server");
+        return;
+    }
+    // finish the process
+    return;
 }
+
 
 // 5. check messages
 void checkMessages(char userId[4], int client_socket) {
-    // client function
     char command[MAX_BUFFER_SIZE];
-    strcpy(command, userId);
-    strcat(command, ":5:");
-    // server response
+    snprintf(command, sizeof(command), "%s:5", userId); // 5 is the code for checkMessages
+    send(client_socket, command, strlen(command), 0);
+
+    // Receive the list of senders from the server
     char buffer[MAX_BUFFER_SIZE];
     ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
-    if (received_bytes > 0) {
-        buffer[received_bytes] = '\0'; // Null-terminate the received data
-        printf("Server response: %s\n", buffer);
+    buffer[received_bytes] = '\0';
+    if(received_bytes > 0)
+    {
+//        printf("Server response: %s\n", buffer);
+        if(strstr(buffer, "No message")){
+            printf("There are no messages yet!\n");
+            return;
+        } else {
+            printf("User has messages, continuing...\n");
+            printf("You have messages from the following users:\n%s", buffer);
+
+            printf("Whose messages do you want to read? Enter User ID: ");
+            char senderId[4];
+            scanf("%3s", senderId);
+
+            // Now, request the specific messages from the server
+            // The server would need to handle this additional request
+            snprintf(command, sizeof(command), "%s:5:%s", userId, senderId); // Additional info for specific user's messages
+            send(client_socket, command, strlen(command), 0);
+
+            // Receive the messages
+            received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+            buffer[received_bytes] = '\0';
+
+            // Display the messages
+            printf("Messages from User %s:\n%s", senderId, buffer);
+        }
     } else {
         perror("Error receiving data from server");
+        return;
     }
+
 }
+
 
 //// Utils
 void promptForUserInfo(UserInfo *userInfo) {
@@ -358,4 +410,20 @@ void promptForUserInfo(UserInfo *userInfo) {
     printf("Surname: ");
     // Read up to 14 characters until a newline is encountered
     scanf("%14[^\n]", userInfo->surname);
+}
+void formatUserId(char *input, char *userId) {
+    if (strlen(input) == 2) {
+        userId[0] = '0';
+        userId[1] = input[0];
+        userId[2] = input[1];
+    } else if (strlen(input) == 1) {
+        userId[0] = '0';
+        userId[1] = '0';
+        userId[2] = input[0];
+    } else {
+        userId[0] = input[0];
+        userId[1] = input[1];
+        userId[2] = input[2];
+    }
+    userId[3] = '\0';  // Ensure string is null-terminated
 }
