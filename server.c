@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PORT 3013
+#define PORT 3015
 #define MAX_BUFFER_SIZE 1024
 
 pthread_mutex_t userList_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -190,58 +190,82 @@ void *handleClient(void *args) {
         puts("\nSERVER - START CONNECTION");
         strncpy(userId, buffer, 3);
         userId[3] = '\0';
-        mode = buffer[4];
-        printf("SERVER - Connected client Id: %s and mode: %c\n", userId, mode);
-        char new[2];
-        new[0] = mode;
-        new[1] = '\0';
-        // puts(new);
 
-        // Check if the user exists in the user list
-        bool userExists = checkUserExists(userId, serverInfo->userList);
+        char *endPtr;
+        long userIdInt = strtol(userId, &endPtr, 10); // Base 10 for decimal numbers
 
-        if (!userExists) {
-            // If the user does not exist, create a new user
-            puts("\n SERVER - User does not exist!");
-            puts("\n SERVER - Creating the user...");
-            createNewUser(userId, serverInfo->userList);
+        // Check if userId is not a number or contains additional characters after a number
+        if (endPtr == userId || *endPtr != '\0') {
+            puts("\nSERVER - User Id is not a valid integer...");
+            puts("\nSERVER - The connection of this thread is closed");
+            flag = 0;
+//            close(serverInfo->client_socket);
+//            free(serverInfo);
+//            exit(EXIT_FAILURE);
+            continue;
         } else {
-            puts("\n SERVER - User exists, continuing...");
-            pthread_mutex_lock(&userList_mutex);
-            printAllUsers(*(serverInfo->userList));
-            pthread_mutex_unlock(&userList_mutex);
+            mode = buffer[4];
+            printf("SERVER - Connected client Id: %s and mode: %c\n", userId, mode);
+            char new[2];
+            new[0] = mode;
+            new[1] = '\0';
+            // puts(new);
 
-        }
+            // Check if the user exists in the user list
+            bool userExists = checkUserExists(userId, serverInfo->userList);
 
-        switch (mode) {
-            case '1':
-                puts("\nSERVER - 1 - request to send Contacts");
-                sendContacts(userId, serverInfo->userList, serverInfo->client_socket);
-                break;
-            case '2':
-                puts("\nSERVER - 2 - request to add User");
-                addUserToContact(userId, serverInfo->userList, serverInfo->client_socket, received_bytes, buffer);
-                break;
-            case '3':
-                puts("\nSERVER - 3 - request to delete User");
-                deleteUser(userId, serverInfo->userList, serverInfo->client_socket);
-                break;
-            case '4':
-                puts("\nSERVER - 4 - request to take/send Messages");
-                takeMessages(userId, serverInfo->userList, serverInfo->client_socket);
-                break;
-            case '5':
-                puts("\nSERVER - 5 - request to check Messages");
-                checkMessage(userId, serverInfo->userList, serverInfo->client_socket);
-                break;
-            case '6':
-                puts("\nSERVER - 6 - request to close client");
-                flag = 0;
-                break;
-            default:
-                break;
+            if (!userExists) {
+                // If the user does not exist, create a new user
+                puts("\n SERVER - User does not exist!");
+                puts("\n SERVER - Creating the user...");
+                createNewUser(userId, serverInfo->userList);
+
+            } else {
+                puts("\n SERVER - User exists, continuing...");
+                pthread_mutex_lock(&userList_mutex);
+                printAllUsers(*(serverInfo->userList));
+                pthread_mutex_unlock(&userList_mutex);
+
+            }
+
+            switch (mode) {
+                case '1':
+                    puts("\nSERVER - 1 - request to send Contacts");
+                    sendContacts(userId, serverInfo->userList, serverInfo->client_socket);
+                    break;
+                case '2':
+                    puts("\nSERVER - 2 - request to add User");
+                    addUserToContact(userId, serverInfo->userList, serverInfo->client_socket, received_bytes, buffer);
+                    break;
+                case '3':
+                    puts("\nSERVER - 3 - request to delete User");
+                    deleteUser(userId, serverInfo->userList, serverInfo->client_socket);
+                    break;
+                case '4':
+                    puts("\nSERVER - 4 - request to take/send Messages");
+                    takeMessages(userId, serverInfo->userList, serverInfo->client_socket);
+                    break;
+                case '5':
+                    puts("\nSERVER - 5 - request to check Messages");
+                    checkMessage(userId, serverInfo->userList, serverInfo->client_socket);
+                    break;
+                case '6':
+                    puts("\nSERVER - 6 - request to close client");
+                    flag = 0;
+                    break;
+                default:
+                    break;
+            }
         }
     }
+//        if (userIdInt < 0 || userIdInt > 999) {
+//            puts("\nSERVER - User Id is out of range");
+//            close(serverInfo->client_socket);
+//            free(serverInfo);
+//            exit(EXIT_FAILURE);
+//        }
+
+
     // Close the connection
     close(serverInfo->client_socket);
     free(serverInfo);
