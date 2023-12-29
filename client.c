@@ -113,8 +113,7 @@ int main(int argc, char *argv[]) {
 
 int showMenu() {
     int choice;
-    bool _stop;
-    _stop = false;
+    bool continueClient = true;
     do {
         printf("\n\n<--- MENU ---> \n");
         printf("1. List Contacts\n");
@@ -126,11 +125,14 @@ int showMenu() {
         printf("Choice: ");
         scanf("%d", &choice);
 
-        if (choice > 6) {
-            if (choice <= 0)
-                _stop = true;
+        if (choice > 6 || choice <= 0) {
+            printf("\033[33mPlease choose a valid Menu Option!\n\033[0m");
+            continueClient = true;
+        } else {
+            continueClient = false;
         }
-    } while (_stop);
+
+    } while (continueClient);
     return choice;
 }
 // void sendUserId(int client_socket, char userId[4]) {
@@ -255,18 +257,22 @@ void addUser(char userId[4], int client_socket) {
     char message[MAX_BUFFER_SIZE];
     snprintf(message, MAX_BUFFER_SIZE, "%s:2:%s_%s_%s_%s", userId, userInfo.id, userInfo.phone, userInfo.name,
              userInfo.surname);
-
-    printf("Client - ADD User: %s\n", message);
+//    printf("Client - ADD User: %s\n", message);
     if (send(client_socket, message, strlen(message), 0) < 0) {
         perror("Error sending data to server");
         return;
     }
-    printf("Client - Now waiting for the server response...\n");
+//    printf("Client - Now waiting for the server response...\n");
     char buffer[MAX_BUFFER_SIZE];
     ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
     if (received_bytes > 0) {
         buffer[received_bytes] = '\0'; // Null-terminate the received data
-        printf("Server response: %s\n", buffer);
+//        printf("Server response: %s\n", buffer);
+        if (strstr(buffer, "Contact already exists")) {
+            printf("\033[31m\tError: %s! You cannot add an existing contact.\n\033[0m", buffer);
+        } else {
+            printf("\033[32mUser added successfully!\n\033[0m");
+        }
     } else {
         perror("Error receiving data from server");
     }
@@ -274,20 +280,32 @@ void addUser(char userId[4], int client_socket) {
 
 // 3. delete user
 void deleteUser(char userId[4], int client_socket) {
+    char contactId[4];
 
-    // client function
+    printf("\tEnter the ID of the contact to be deleted: ");
+    scanf("%3s", contactId);
+    strcpy(contactId, formatUserIdOneInput(contactId));
+    // Check if the entered ID is not the same as the client's own ID
+    if (strcmp(contactId, userId) == 0) {
+        printf("\033[31m\tError: Cannot delete own user ID.\n\033[0m");
+        return;
+    }
+
+    // Format the command to send to the server
     char command[MAX_BUFFER_SIZE];
-    strcpy(command, userId);
-    strcat(command, ":3:");
-    // delete user things
+    snprintf(command, sizeof(command), "%s:3:%s", userId, contactId);
     send(client_socket, command, strlen(command), 0);
 
-    // server response
+    // Await and process server response
     char buffer[MAX_BUFFER_SIZE];
     ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
     if (received_bytes > 0) {
         buffer[received_bytes] = '\0'; // Null-terminate the received data
-        printf("Server response: %s\n", buffer);
+        if(strcmp(buffer, "Contact not found") == 0) {
+            printf("\033[31m\tError: %s\n\033[0m", buffer);
+        } else {
+            printf("\033[32m\tUser deleted successfully!\n\033[0m");
+        }
     } else {
         perror("Error receiving data from server");
     }
@@ -297,7 +315,7 @@ void deleteUser(char userId[4], int client_socket) {
 void sendMessages(char userId[4], int client_socket) {
     char recipientId[4];
 
-    printf("Enter recipient's User ID: ");
+    printf("\tEnter recipient's User ID: ");
     scanf("%3s", recipientId);
     getchar();  // Clear newline character from the buffer
     recipientId[3] = '\0';  // Ensure string is null-terminated
@@ -336,7 +354,7 @@ void sendMessages(char userId[4], int client_socket) {
     //// SECOND
     // third part: send the message
     char message[255];
-    printf("Enter your message: ");
+    printf("\tEnter your message: ");
     fgets(message, sizeof(message), stdin);
     message[strcspn(message, "\n")] = 0;  // Remove newline character
     // third part: Send the message to the recipient
@@ -432,7 +450,7 @@ bool promptForUserInfo(char userId[4], UserInfo *userInfo) {
     printf("\nEnter ID, Mobile Phone, Name, Surname, in order:\n");
 
     printf("ID: ");
-    scanf("%9s", userInfo->id);
+    scanf("%3s", userInfo->id);
     strcpy(userInfo->id, formatUserIdOneInput(userInfo->id));
     // Clear the input buffer
     while (getchar() != '\n');
