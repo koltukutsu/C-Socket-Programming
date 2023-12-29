@@ -147,7 +147,7 @@ int main() {
     // loads the database from the local files
     loadDatabase(&userList);
 
-    printf("\n SERVER - Server listening on port: %d\n", PORT);
+    printf("\nSERVER - Server listening on port: %d\n", PORT);
 
     while (1) {
         // Accept a connection
@@ -687,12 +687,12 @@ void checkMessages(char userId[4], User **userList, int client_socket) {
 
             message = currentUser->messagesList;
             puts("\t\tSending the messages...");
-            puts("\t\tClient ID:");
-            puts(currentUser->userId);
-            puts("\t\tWanted Sender ID:");
-            puts(senderId);
+//            puts("\t\tClient ID:");
+//            puts(currentUser->userId);
+//            puts("\t\tWanted Sender ID:");
+//            puts(senderId);
             bool flagSentMessage = false;
-            printf("flag %d\n", flagSentMessage);
+//            printf("flag %d\n", flagSentMessage);
             while (message != NULL) {
                 char messageToSend[MAX_BUFFER_SIZE] = {0};
                 printf("\tMessage Sender ID: %s\n", message->correspondentId);
@@ -738,7 +738,7 @@ void checkMessages(char userId[4], User **userList, int client_socket) {
                 message = message->nextMessage;
 
             }
-            printf("flag %d\n", flagSentMessage);
+//            printf("flag %d\n", flagSentMessage);
             if (flagSentMessage) {
                 char *msgTerminate = "Finish";
                 send(client_socket, msgTerminate, strlen(msgTerminate), 0);
