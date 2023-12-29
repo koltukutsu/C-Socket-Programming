@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PORT 4001
+#define PORT 4003
 #define MAX_BUFFER_SIZE 1024
 
 pthread_mutex_t userList_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -147,7 +147,7 @@ int main() {
     // loads the database from the local files
     loadDatabase(&userList);
 
-    printf("\nSERVER - Server listening on port: %d\n", PORT);
+    printf("\n SERVER - Server listening on port: %d\n", PORT);
 
     while (1) {
         // Accept a connection
@@ -662,7 +662,7 @@ void checkMessages(char userId[4], User **userList, int client_socket) {
             // there are messages
             while (message != NULL) {
                 if (strstr(senders, message->correspondentId) == NULL) {
-                    strcat(senders, "User ");
+                    strcat(senders, "You have message from User ");
                     strcat(senders, message->correspondentId);
                     strcat(senders, "\n");
                 }
@@ -1023,54 +1023,55 @@ void loadMessagesFromFile(const char *filePath, Message **messagesList) {
         return;
     }
 
-    // Dynamic array to store messages temporarily
     char (*tempMessages)[255 + 4] = malloc(10 * sizeof(*tempMessages));
     int messageCount = 0, arraySize = 10;
-
     char line[255 + 4];
-    bool isEmpty = true;
+    bool isEmpty = true, memoryError = false;
 
-    while (fgets(line, sizeof(line), file)) {
+    while (fgets(line, sizeof(line), file) && !memoryError) {
         isEmpty = false;
 
-        // Resize array if necessary
         if (messageCount == arraySize) {
             arraySize *= 2;
-            tempMessages = realloc(tempMessages, arraySize * sizeof(*tempMessages));
-            if (!tempMessages) {
+            char (*newMessages)[255 + 4] = realloc(tempMessages, arraySize * sizeof(*newMessages));
+            if (!newMessages) {
                 perror("Error reallocating memory");
-                break;
+                memoryError = true;
+                free(tempMessages);
+            } else {
+                tempMessages = newMessages;
             }
         }
 
-        // Store message in array
-        strncpy(tempMessages[messageCount], line, sizeof(*tempMessages) - 1);
-        tempMessages[messageCount][sizeof(*tempMessages) - 1] = '\0'; // Ensure null-termination
-        messageCount++;
+        if (!memoryError) {
+            strncpy(tempMessages[messageCount], line, sizeof(*tempMessages) - 1);
+            tempMessages[messageCount][sizeof(*tempMessages) - 1] = '\0';
+            messageCount++;
+        }
     }
 
-    // Read messages in reverse order and add to the list
-    for (int i = messageCount - 1; i >= 0; i--) {
-        Message *newMessage = (Message *)malloc(sizeof(Message));
-        if (newMessage == NULL) {
-            perror("Error allocating memory for new message");
-            continue;
+    if (!memoryError) {
+        for (int i = messageCount - 1; i >= 0; i--) {
+            Message *newMessage = malloc(sizeof(Message));
+            if (newMessage) {
+                sscanf(tempMessages[i], "%3[^:]:%254[^\n]", newMessage->correspondentId, newMessage->message);
+                newMessage->nextMessage = *messagesList;
+                *messagesList = newMessage;
+                printf("\n\t\t\tCorrespondent ID: %s, Message: %s", newMessage->correspondentId, newMessage->message);
+            } else {
+                perror("Error allocating memory for new message");
+            }
         }
-
-        sscanf(tempMessages[i], "%3[^:]:%254[^\n]", newMessage->correspondentId, newMessage->message);
-        newMessage->nextMessage = *messagesList;
-        *messagesList = newMessage;
-        printf("\n\t\t\tCorrespondent ID: %s, Message: %s", newMessage->correspondentId, newMessage->message);
+        free(tempMessages);
     }
 
     if (isEmpty) {
         printf("\n\t\t\tNo messages found in file: %s", filePath);
-    } else {
-        free(tempMessages);
     }
 
     fclose(file);
 }
+
 void loadDatabase(User **userList) {
     DIR *dir;
     struct dirent *entry;

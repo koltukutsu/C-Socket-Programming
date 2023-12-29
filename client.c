@@ -12,7 +12,7 @@
 #include <pthread.h>
 
 #define SERVER_IP "127.0.0.1"
-#define PORT 4001
+#define PORT 4003
 #define MAX_BUFFER_SIZE 1024
 
 typedef struct {
@@ -25,26 +25,24 @@ typedef struct {
 
 typedef struct client_t {
     char userId[4];
-    int client_socket;
+    int clientSocket;
 } client_t;
 
 int showMenu();
 
-// void sendUserId(int client_socket, char userId[4]);
-void *receive_messages(void *arg);
-
-void userChoiceOperations(int choice, int client_socket, char userId[4]);
+// void sendUserId(int clientSocket, char userId[4]);
+void userChoiceOperations(int choice, int clientSocket, char userId[4]);
 
 //// MENU Operations
-void getContacts(char userId[4], int client_socket);
+void getContacts(char userId[4], int clientSocket);
 
-void addUser(char userId[4], int client_socket);
+void addUser(char userId[4], int clientSocket);
 
-void deleteUser(char userId[4], int client_socket);
+void deleteUser(char userId[4], int clientSocket);
 
-void sendMessages(char userId[4], int client_socket);
+void sendMessages(char userId[4], int clientSocket);
 
-void checkMessages(char userId[4], int client_socket);
+void checkMessages(char userId[4], int clientSocket);
 
 //// UTILS
 bool promptForUserInfo(char userId[4], UserInfo *userInfo);
@@ -54,9 +52,9 @@ void formatUserId(char *input, char *userId);
 char *formatUserIdOneInput(const char *input);
 
 int main(int argc, char *argv[]) {
-    int client_socket;
+    int clientSocket;
     int choice;
-    struct sockaddr_in server_address;
+    struct sockaddr_in serverAddress;
     char userId[4];
 //  pthread_t recv_thread;
 
@@ -71,7 +69,7 @@ int main(int argc, char *argv[]) {
         printf("\033[33m\tCLIENT %s - Assigned User ID: %s\n\033[0m", userId, userId);
     }
     // Create a socket
-    if ((client_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+    if ((clientSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("Error creating socket");
         exit(EXIT_FAILURE);
     } else {
@@ -79,20 +77,20 @@ int main(int argc, char *argv[]) {
     }
 
     // Set up the server address structure
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(PORT);
-    inet_aton(SERVER_IP, &server_address.sin_addr);
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_port = htons(PORT);
+    inet_aton(SERVER_IP, &serverAddress.sin_addr);
 
     // Connect to the server
-    if (connect(client_socket, (struct sockaddr *) &server_address,
-                sizeof(server_address)) == -1) {
+    if (connect(clientSocket, (struct sockaddr *) &serverAddress,
+                sizeof(serverAddress)) == -1) {
         perror("Error connecting to the server");
-        close(client_socket);
+        close(clientSocket);
         exit(EXIT_FAILURE);
     }
 
     // Create a thread for receiving messages from the server
-//  if (pthread_create(&recv_thread, NULL, receive_messages, &client_socket) != 0)
+//  if (pthread_create(&recv_thread, NULL, receive_messages, &clientSocket) != 0)
 //  {
 //    perror("Thread creation failed");
 //    exit(EXIT_FAILURE);
@@ -100,12 +98,12 @@ int main(int argc, char *argv[]) {
 
     do {
         choice = showMenu();
-        userChoiceOperations(choice, client_socket, userId);
+        userChoiceOperations(choice, clientSocket, userId);
     } while (choice != 6);
     // Close the client socket
     // close the thread for the 'always listener'
 //  pthread_cancel(recv_thread);
-    close(client_socket);
+    close(clientSocket);
     pthread_exit(NULL);
 
     return 0;
@@ -145,62 +143,34 @@ int showMenu() {
 
     return choice;
 }
-// void sendUserId(int client_socket, char userId[4]) {
-//   printf("CLIENT %s - Sending User Id: %s\n", userId, userId);
-//   send(client_socket, userId, strlen(userId), 0);
 
-void *receive_messages(void *arg) {
-//  int client_socket = *(int *)arg;
-//  char buffer[MAX_BUFFER_SIZE];
-//  while (1)
-//  {
-//    memset(buffer, 0, sizeof(buffer));
-//    if (recv(client_socket, buffer, sizeof(buffer), 0) <= 0)
-//    {
-//      perror("Server disconnected.");
-//      exit(EXIT_FAILURE);
-//    }
-//    printf("Server: %s\n", buffer);
-//  }
-}
-
-//   // server response
-//   char buffer[MAX_BUFFER_SIZE];
-//   ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
-//   if (received_bytes > 0) {
-//     buffer[received_bytes] = '\0'; // Null-terminate the received data
-//     printf("Server response: %s\n", buffer);
-//   } else {
-//     perror("Error receiving data from server");
-//   }
-// }
-void userChoiceOperations(int choice, int client_socket, char userId[4]) {
+void userChoiceOperations(int choice, int clientSocket, char userId[4]) {
 
     switch (choice) {
         case 1:
             printf("\tYour Contacts:\n");
             // pthread_create(&tid, NULL, getContacts, &client_info);
-            getContacts(userId, client_socket);
+            getContacts(userId, clientSocket);
             break;
         case 2:
             printf("\tAdding User:\n");
             // pthread_create(&tid, NULL, addUser, &client_info);
-            addUser(userId, client_socket);
+            addUser(userId, clientSocket);
             break;
         case 3:
             printf("\tDeleting User:\n");
             // pthread_create(&tid, NULL, deleteUser, &client_info);
-            deleteUser(userId, client_socket);
+            deleteUser(userId, clientSocket);
             break;
         case 4:
             printf("\tSending Messages:\n");
             // pthread_create(&tid, NULL, sendMessages, &client_info);
-            sendMessages(userId, client_socket);
+            sendMessages(userId, clientSocket);
             break;
         case 5:
             // pthread_create(&tid, NULL, checkMessages, &client_info);
             printf("\tChecking Messages:\n");
-            checkMessages(userId, client_socket);
+            checkMessages(userId, clientSocket);
             break;
         case 6:
             printf("\033[31m\tClosing the client now...\n\033[0m");
@@ -212,17 +182,17 @@ void userChoiceOperations(int choice, int client_socket, char userId[4]) {
 
 //// MENU
 // 1. get contacts
-void getContacts(char userId[4], int client_socket) {
+void getContacts(char userId[4], int clientSocket) {
     char command[MAX_BUFFER_SIZE];
     strcpy(command, userId);
     strcat(command, ":1");
 //    puts("\nCLIENT - get contacts: ");
 //    puts(command);
-    send(client_socket, command, strlen(command), 0);
+    send(clientSocket, command, strlen(command), 0);
 
     // Server response
     char buffer[MAX_BUFFER_SIZE];
-    ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+    ssize_t received_bytes = recv(clientSocket, buffer, sizeof(buffer), 0);
     if (received_bytes > 0) {
         buffer[received_bytes] = '\0'; // Null-terminate the received data
 //        printf("Server response: %s\n", buffer);
@@ -256,7 +226,7 @@ void getContacts(char userId[4], int client_socket) {
 
 
 // 2. add user
-void addUser(char userId[4], int client_socket) {
+void addUser(char userId[4], int clientSocket) {
     UserInfo userInfo;
     bool isYourself = promptForUserInfo(userId, &userInfo);
     if (isYourself) {
@@ -268,13 +238,13 @@ void addUser(char userId[4], int client_socket) {
     snprintf(message, MAX_BUFFER_SIZE, "%s:2:%s_%s_%s_%s", userId, userInfo.id, userInfo.phone, userInfo.name,
              userInfo.surname);
 //    printf("Client - ADD User: %s\n", message);
-    if (send(client_socket, message, strlen(message), 0) < 0) {
+    if (send(clientSocket, message, strlen(message), 0) < 0) {
         perror("Error sending data to server");
         return;
     }
 //    printf("Client - Now waiting for the server response...\n");
     char buffer[MAX_BUFFER_SIZE];
-    ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+    ssize_t received_bytes = recv(clientSocket, buffer, sizeof(buffer), 0);
     if (received_bytes > 0) {
         buffer[received_bytes] = '\0'; // Null-terminate the received data
 //        printf("Server response: %s\n", buffer);
@@ -289,7 +259,7 @@ void addUser(char userId[4], int client_socket) {
 }
 
 // 3. delete user
-void deleteUser(char userId[4], int client_socket) {
+void deleteUser(char userId[4], int clientSocket) {
     char contactId[4];
 
     printf("\tEnter the ID of the contact to be deleted: ");
@@ -304,11 +274,11 @@ void deleteUser(char userId[4], int client_socket) {
     // Format the command to send to the server
     char command[MAX_BUFFER_SIZE];
     snprintf(command, sizeof(command), "%s:3:%s", userId, contactId);
-    send(client_socket, command, strlen(command), 0);
+    send(clientSocket, command, strlen(command), 0);
 
     // Await and process server response
     char buffer[MAX_BUFFER_SIZE];
-    ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+    ssize_t received_bytes = recv(clientSocket, buffer, sizeof(buffer), 0);
     if (received_bytes > 0) {
         buffer[received_bytes] = '\0'; // Null-terminate the received data
         if (strcmp(buffer, "Contact not found") == 0) {
@@ -322,31 +292,35 @@ void deleteUser(char userId[4], int client_socket) {
 }
 
 // 4. send messages
-void sendMessages(char userId[4], int client_socket) {
+void sendMessages(char userId[4], int clientSocket) {
+    char input[255 + 4]; // Maximum message length + space for recipientId
     char recipientId[4];
+    char message[255];
 
-    printf("\tEnter recipient's User ID: ");
-    scanf("%3s", recipientId);
-    getchar();  // Clear newline character from the buffer
-    recipientId[3] = '\0';  // Ensure string is null-terminated
+    // Clear the input buffer
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF) { }
+    printf("\tEnter recipient's User ID followed by the message (e.g., '12 Hello there'): ");
+    fgets(input, sizeof(input), stdin);
+    sscanf(input, "%3s %[^\n]", recipientId, message); // Read first 3 characters as ID, rest as message
+    recipientId[3] = '\0'; // Ensure null-termination
+
     strcpy(recipientId, formatUserIdOneInput(recipientId));
     printf("Here is the recipient ID: %s\n", recipientId);
     if (strcmp(userId, recipientId) == 0) {
         printf("\033[31m\tError: You cannot send a message to yourself!\n\033[0m");
         return;
     }
-    //// FIRST
-    // First part: Send the client userID and mode
+
     char initialCommand[MAX_BUFFER_SIZE];
     snprintf(initialCommand, sizeof(initialCommand), "%s:4:%s", userId, recipientId);
-    send(client_socket, initialCommand, strlen(initialCommand), 0);
-    //First Part Server response
+    send(clientSocket, initialCommand, strlen(initialCommand), 0);
+
     char buffer[MAX_BUFFER_SIZE];
-    ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+    ssize_t received_bytes = recv(clientSocket, buffer, sizeof(buffer), 0);
 
     if (received_bytes > 0) {
         buffer[received_bytes] = '\0'; // Null-terminate the received data
-//        printf("Server response: %s\n", buffer);
         if (strcmp(buffer, "Same") == 0) {
             printf("\033[31m\tError: You cannot send a message to yourself!\n\033[0m");
             return;
@@ -361,21 +335,14 @@ void sendMessages(char userId[4], int client_socket) {
         return;
     }
 
-    // third part: send the message
-    char message[255];
-    printf("\tEnter your message: ");
-    fgets(message, sizeof(message), stdin);
-    message[strcspn(message, "\n")] = 0;  // Remove newline character
-    // third part: Send the message to the recipient
     char fullMessage[MAX_BUFFER_SIZE];
     snprintf(fullMessage, sizeof(fullMessage), "mes:%s:", message);
-    send(client_socket, fullMessage, strlen(fullMessage), 0);
+    send(clientSocket, fullMessage, strlen(fullMessage), 0);
 
     char bufferFinal[MAX_BUFFER_SIZE];
-    ssize_t received_bytes_final = recv(client_socket, bufferFinal, sizeof(bufferFinal), 0);
+    ssize_t received_bytes_final = recv(clientSocket, bufferFinal, sizeof(bufferFinal), 0);
     if (received_bytes_final > 0) {
         bufferFinal[received_bytes_final] = '\0'; // Null-terminate the received data
-//        printf("Server response: %s\n", bufferFinal);
         if (strcmp(bufferFinal, "Terminate") == 0) {
             printf("\033[31m\tError: %s\n\033[0m", bufferFinal);
             return;
@@ -385,20 +352,18 @@ void sendMessages(char userId[4], int client_socket) {
         perror("Client - Error receiving data from server");
         return;
     }
-    // finish the process
-    return;
 }
 
 
 // 5. check messages
-void checkMessages(char userId[4], int client_socket) {
+void checkMessages(char userId[4], int clientSocket) {
     char command[MAX_BUFFER_SIZE];
     snprintf(command, sizeof(command), "%s:5", userId); // 5 is the code for checkMessages
-    send(client_socket, command, strlen(command), 0);
+    send(clientSocket, command, strlen(command), 0);
 
     // Receive the list of senders from the server
     char buffer[MAX_BUFFER_SIZE];
-    ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
+    ssize_t received_bytes = recv(clientSocket, buffer, sizeof(buffer), 0);
     buffer[received_bytes] = '\0';
     if (received_bytes > 0) {
 //        printf("Server response: %s\n", buffer);
@@ -416,10 +381,11 @@ void checkMessages(char userId[4], int client_socket) {
             // Now, request the specific messages from the server
             // The server would need to handle this additional request
             snprintf(command, sizeof(command), "%s", senderId); // Additional info for specific user's messages
-            send(client_socket, command, strlen(command), 0);
+            send(clientSocket, command, strlen(command), 0);
 
             // Receive the messages one by one
-            printf("\nMessages from User %s:\n", senderId);
+            strcpy(senderId, formatUserIdOneInput(senderId));
+            printf("\nMessages from User %s:\n\n", senderId);
             bool flagContinue = true;
 
             int counter = 0;
@@ -427,7 +393,7 @@ void checkMessages(char userId[4], int client_socket) {
             while (flagContinue) {
                 counter++;
                 char takenMessage[MAX_BUFFER_SIZE] = {0};
-                ssize_t receivedBytesMessage = recv(client_socket, takenMessage, sizeof(takenMessage), 0);
+                ssize_t receivedBytesMessage = recv(clientSocket, takenMessage, sizeof(takenMessage), 0);
                 takenMessage[receivedBytesMessage] = '\0';
 //                printf("Response: %s\n", takenMessage);
                 if (strcmp(takenMessage, "Terminate") == 0) {
@@ -442,7 +408,7 @@ void checkMessages(char userId[4], int client_socket) {
                         // confirm that the message is taken
                         char confirmMessage[MAX_BUFFER_SIZE];
                         snprintf(confirmMessage, sizeof(confirmMessage), "%s", "Message received");
-                        send(client_socket, confirmMessage, strlen(confirmMessage), 0);
+                        send(clientSocket, confirmMessage, strlen(confirmMessage), 0);
 
                     }
                 }
