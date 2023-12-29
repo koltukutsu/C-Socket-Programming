@@ -106,6 +106,8 @@ void loadDatabase(User **userList);
 
 void printFileContents(const char *filePath);
 
+void sendInitiationMessage(int socket);
+
 int main() {
     if (true) {
         char pwd[100];
@@ -264,6 +266,10 @@ void *handleClient(void *args) {
                     puts("\nSERVER - 6 - request to close client");
                     flag = 0;
                     break;
+                case '7':
+                    // initiation step
+                    sendInitiationMessage(serverInfo->clientSocket);
+                    break;
                 default:
                     break;
             }
@@ -280,6 +286,11 @@ void *handleClient(void *args) {
     // Close the connection
     close(serverInfo->clientSocket);
     free(serverInfo);
+}
+
+void sendInitiationMessage(int socket) {
+    char *initiationMessage = "Initiation";
+    send(socket, initiationMessage, strlen(initiationMessage), 0);
 }
 
 //// Menu Operations

@@ -31,7 +31,8 @@ typedef struct client_t {
 int showMenu();
 
 // void sendUserId(int clientSocket, char userId[4]);
-void userChoiceOperations(int choice, int clientSocket, char userId[4]);
+void initiationOfClient(char userId[4], int clientSocket);
+        void userChoiceOperations(int choice, int clientSocket, char userId[4]);
 
 //// MENU Operations
 void getContacts(char userId[4], int clientSocket);
@@ -97,6 +98,7 @@ int main(int argc, char *argv[]) {
 //  }
 
     do {
+        initiationOfClient(userId, clientSocket);
         choice = showMenu();
         userChoiceOperations(choice, clientSocket, userId);
     } while (choice != 6);
@@ -177,6 +179,27 @@ void userChoiceOperations(int choice, int clientSocket, char userId[4]) {
             break;
         default:
             break;
+    }
+}
+
+void initiationOfClient(char userId[4], int clientSocket) {
+    char command[MAX_BUFFER_SIZE];
+    strcpy(command, userId);
+    strcat(command, ":7");
+    send(clientSocket, command, strlen(command), 0);
+
+    // Server response
+    char buffer[MAX_BUFFER_SIZE];
+    ssize_t received_bytes = recv(clientSocket, buffer, sizeof(buffer), 0);
+    if (received_bytes > 0) {
+        buffer[received_bytes] = '\0'; // Null-terminate the received data
+        if(strcmp(buffer, "Initiation") == 0){
+            printf("\033[32m\tUser Session started successfully!\n\033[0m");
+        } else {
+            printf("\033[31m\tError: %s\n\033[0m", buffer);
+        }
+    } else {
+        perror("Error receiving data from server");
     }
 }
 
@@ -299,7 +322,7 @@ void sendMessages(char userId[4], int clientSocket) {
 
     // Clear the input buffer
     int c;
-    while ((c = getchar()) != '\n' && c != EOF) { }
+    while ((c = getchar()) != '\n' && c != EOF) {}
     printf("\tEnter recipient's User ID followed by the message (e.g., '12 Hello there'): ");
     fgets(input, sizeof(input), stdin);
     sscanf(input, "%3s %[^\n]", recipientId, message); // Read first 3 characters as ID, rest as message
