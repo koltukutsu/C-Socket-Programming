@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PORT 8004
+#define PORT 8005
 #define MAX_BUFFER_SIZE 1024
 
 pthread_mutex_t userList_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -94,7 +94,7 @@ char *formatUserIdOneInput(const char *input);
 void formatUserId(char *input, char *userId);
 
 //// FILE & FOLDER Operations
-void addMessageToFile(char userId[4], char *message);
+void addMessageToFile(char recipientId[4], char senderId[4], char *message);
 
 void addContactToFile(char userId[4], char *contactInfo);
 
@@ -239,6 +239,7 @@ void *handleClient(void *args) {
             // If it enters here, the mod and the userID is already given
             // so there is already a buffer present here
             // and client wants a response from the server...
+            printf("\n\tClient/User Id: %s\n", userId);
             switch (mode) {
                 case '1':
                     puts("\nSERVER - 1 - request to send Contacts");
@@ -543,6 +544,15 @@ takeMessages(char userId[4], User **userList, int client_socket, ssize_t receive
                     // Acknowledge that the message has been added
                     char confirmMsg[] = "Message added successfully";
                     send(client_socket, confirmMsg, strlen(confirmMsg), 0);
+                    // Write the message to the recipient's messages.txt file using the addMessageToFile function
+                    char message[255]; // Adjust the size as needed
+                    if (strlen(messageBuffer) > 255) {
+                        // Message is too long, reducing the size of it
+                        printf("\033[33m\t\tMessage is too long, truncating to 255 characters\n\033[0m");
+                        messageBuffer[255] = '\0';
+                    }
+                    strncpy(message, messageBuffer, sizeof(newMessage->message) - 1);
+                    addMessageToFile(recipientId, userId,message);
                     flagOut = true;
                 }
 
@@ -583,6 +593,7 @@ void checkMessages(char userId[4], User **userList, int client_socket) {
             // there are messages
             while (message != NULL) {
                 if (strstr(senders, message->correspondentId) == NULL) {
+                    strcat(senders, "User ");
                     strcat(senders, message->correspondentId);
                     strcat(senders, "\n");
                 }
@@ -590,7 +601,75 @@ void checkMessages(char userId[4], User **userList, int client_socket) {
             }
 
             // Send the list of senders back to the client
+            puts("\t\tSending the message senders list...");
             send(client_socket, senders, strlen(senders), 0);
+
+            // Receive the sender ID from the client
+            char senderId[4];
+            ssize_t receivedBytes = recv(client_socket, senderId, sizeof(senderId), 0);
+            puts("\t\tReceived the sender ID from the client...");
+            if (receivedBytes < 0) {
+                perror("Error receiving data from client");
+                pthread_mutex_unlock(&userList_mutex);
+                return;
+            }
+            senderId[receivedBytes] = '\0'; // Ensure null-termination
+            strcpy(senderId, formatUserIdOneInput(senderId));
+
+            message = currentUser->messagesList;
+            puts("\t\tSending the messages...");
+            puts("\t\tClient ID:");
+            puts(currentUser->userId);
+            puts("\t\tWanted Sender ID:");
+            puts(senderId);
+            char messageToSend[MAX_BUFFER_SIZE];
+            bool flagSentMessage = false;
+            while (message != NULL) {
+                if (strcmp(senderId, message->correspondentId) == 0) {
+//                    strcpy(messageToSend, "Message: ");
+//                    strcpy(messageToSend, "\t - ");
+                    strcat(messageToSend, message->message);
+                    strcat(messageToSend, "\n");
+                    // terminate the message string
+                    messageToSend[strlen(messageToSend)] = '\0';
+                    // send the message to the client
+                    send(client_socket, messageToSend, strlen(messageToSend), 0);
+                    flagSentMessage = true;
+                    // control whether the message is sent or not
+                    char confirmMsg[MAX_BUFFER_SIZE];
+                    ssize_t receivedBytesConfirm = recv(client_socket, confirmMsg, sizeof(confirmMsg), 0);
+                    if (receivedBytesConfirm < 0) {
+                        perror("Error receiving data from client");
+                        pthread_mutex_unlock(&userList_mutex);
+                        return;
+                    }
+                    confirmMsg[receivedBytesConfirm] = '\0'; // Ensure null-termination
+                    printf("\t\tReceived the confirmation message from the client: %s\n", confirmMsg);
+                    if (strcmp(confirmMsg, "Message received") == 0) {
+                        // TODO: Message received, delete it from the user's messages list
+                        // no deletion!!!
+                        // Message *temp = message;
+                        // message = message->nextMessage;
+                        // free(temp);
+                        printf("\033[32m\t\tMessage is sent successfully.\n\033[0m");
+                    } else {
+                        // Message not received, continue to the next message
+                        // message = message->nextMessage;
+                        printf("\033[31m\t\tUnable to send the message!\n\033[0m");
+                    }
+                }
+                message = message->nextMessage;
+
+            }
+            if(flagSentMessage){
+                char *msgTerminate = "Finish";
+                send(client_socket, msgTerminate, strlen(msgTerminate), 0);
+                puts("\t\tFinished the messages...");
+            } else {
+                char *msgTerminate = "Terminate";
+                send(client_socket, msgTerminate, strlen(msgTerminate), 0);
+                puts("\t\tThere is no Message Sender as such...");
+            }
 
         } else {
             // there is no message
@@ -748,9 +827,9 @@ void formatUserId(char *input, char *userId) {
 }
 
 //// FILE & FOLDER Operations
-void addMessageToFile(char userId[4], char *message) {
+void addMessageToFile(char recipientId[4], char senderId[4], char *message) {
     char messagesFilePath[70];
-    snprintf(messagesFilePath, sizeof(messagesFilePath), "./database/user_%s/messages.txt", userId);
+    snprintf(messagesFilePath, sizeof(messagesFilePath), "./database/user_%s/messages.txt", recipientId);
 
     FILE *messagesFile = fopen(messagesFilePath, "a");
     if (messagesFile == NULL) {
@@ -758,7 +837,8 @@ void addMessageToFile(char userId[4], char *message) {
         exit(EXIT_FAILURE);
     }
 
-    fprintf(messagesFile, "%s\n", message);
+    // Writing the message in the format "{senderId}:{message}"
+    fprintf(messagesFile, "%s:%s\n", senderId, message);
     fclose(messagesFile);
 }
 
