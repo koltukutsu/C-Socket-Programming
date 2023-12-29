@@ -49,9 +49,9 @@ typedef struct user {
 } User;
 
 typedef struct server_t {
-    int client_socket;
+    int clientSocket;
     User **userList;
-} server_t;
+} serverType;
 
 enum Mode {
     SEND_CONTACTS = 1,
@@ -66,19 +66,19 @@ enum Mode {
 void *handleClient(void *args);
 
 //// Menu Operations
-void sendContacts(char *userId, User **userList, int client_socket);
+void sendContacts(char *userId, User **userList, int clientSocket);
 
 void
-addUserToContact(char userId[4], User **userList, int client_socket, ssize_t received_bytes,
+addUserToContact(char userId[4], User **userList, int clientSocket, ssize_t receivedBytes,
                  char buffer[MAX_BUFFER_SIZE]);
 
 void
-deleteUser(char userId[4], User **userList, int client_socket, ssize_t received_bytes, char buffer[MAX_BUFFER_SIZE]);
+deleteUser(char userId[4], User **userList, int clientSocket, ssize_t receivedBytes, char buffer[MAX_BUFFER_SIZE]);
 
 void
-takeMessages(char userId[4], User **userList, int client_socket, ssize_t received_bytes, char buffer[MAX_BUFFER_SIZE]);
+takeMessages(char userId[4], User **userList, int clientSocket, ssize_t receivedBytes, char buffer[MAX_BUFFER_SIZE]);
 
-void checkMessages(char userId[4], User **userList, int client_socket);
+void checkMessages(char userId[4], User **userList, int clientSocket);
 
 //// User Operations
 void printContactInfo(const char *contactId, const char *phoneNumber, const char *name, const char *surname);
@@ -113,9 +113,9 @@ int main() {
         printf("Server - Current working directory: %s\n", pwd);
     }
 
-    int server_socket, client_socket;
-    struct sockaddr_in server_address, client_address;
-    socklen_t client_address_len = sizeof(client_address);
+    int server_socket, clientSocket;
+    struct sockaddr_in serverAddress, clientAddress;
+    socklen_t client_address_len = sizeof(clientAddress);
     pthread_t tid;
     User *userList = NULL;
 
@@ -126,13 +126,13 @@ int main() {
     }
 
     // Set up the server address structure
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(PORT);
-    server_address.sin_addr.s_addr = INADDR_ANY;
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_port = htons(PORT);
+    serverAddress.sin_addr.s_addr = INADDR_ANY;
 
     // Bind the socket
-    if (bind(server_socket, (struct sockaddr *) &server_address,
-             sizeof(server_address)) == -1) {
+    if (bind(server_socket, (struct sockaddr *) &serverAddress,
+             sizeof(serverAddress)) == -1) {
         perror("Error binding socket");
         close(server_socket);
         exit(EXIT_FAILURE);
@@ -151,16 +151,16 @@ int main() {
 
     while (1) {
         // Accept a connection
-        if ((client_socket =
-                     accept(server_socket, (struct sockaddr *) &client_address,
+        if ((clientSocket =
+                     accept(server_socket, (struct sockaddr *) &clientAddress,
                             &client_address_len)) == -1) {
             perror("Error accepting connection");
             continue;
         }
-        server_t *serverInfo = (server_t *) malloc(sizeof(server_t));
-        serverInfo->client_socket = client_socket;
+        serverType *serverInfo = (serverType *) malloc(sizeof(serverType));
+        serverInfo->clientSocket = clientSocket;
         serverInfo->userList = &userList;
-        printf("Connection accepted from %s\n", inet_ntoa(client_address.sin_addr));
+        printf("Connection accepted from %s\n", inet_ntoa(clientAddress.sin_addr));
 
         // Handle the client's request
         if (pthread_create(&tid, NULL, &handleClient, (void *) serverInfo) != 0) {
@@ -172,7 +172,6 @@ int main() {
 
     // Close the server socket
     close(server_socket);
-
     return 0;
 }
 
@@ -180,19 +179,19 @@ int main() {
 void *handleClient(void *args) {
     char userId[4];
     char buffer[MAX_BUFFER_SIZE];
-    server_t *serverInfo = (server_t *) args;
+    serverType *serverInfo = (serverType *) args;
     // Receive command from the client
 
     int flag = 1;
     while (flag) {
-        ssize_t received_bytes =
-                recv(serverInfo->client_socket, buffer, sizeof(buffer), 0);
-        if (received_bytes < 0) {
+        ssize_t receivedBytes =
+                recv(serverInfo->clientSocket, buffer, sizeof(buffer), 0);
+        if (receivedBytes < 0) {
             perror("Error receiving data from client");
-            close(serverInfo->client_socket);
+            close(serverInfo->clientSocket);
             pthread_detach(pthread_self());
         }
-        buffer[received_bytes] = '\0'; // Null-terminate the received data
+        buffer[receivedBytes] = '\0'; // Null-terminate the received data
         // if (strlen(buffer) == 3) {
 
         char mode;
@@ -208,7 +207,7 @@ void *handleClient(void *args) {
             puts("\nSERVER - User Id is not a valid integer...");
             puts("\nSERVER - The connection of this thread is closed");
             flag = 0;
-//            close(serverInfo->client_socket);
+//            close(serverInfo->clientSocket);
 //            free(serverInfo);
 //            exit(EXIT_FAILURE);
             continue;
@@ -243,23 +242,23 @@ void *handleClient(void *args) {
             switch (mode) {
                 case '1':
                     puts("\nSERVER - 1 - request to send Contacts");
-                    sendContacts(userId, serverInfo->userList, serverInfo->client_socket);
+                    sendContacts(userId, serverInfo->userList, serverInfo->clientSocket);
                     break;
                 case '2':
                     puts("\nSERVER - 2 - request to add User");
-                    addUserToContact(userId, serverInfo->userList, serverInfo->client_socket, received_bytes, buffer);
+                    addUserToContact(userId, serverInfo->userList, serverInfo->clientSocket, receivedBytes, buffer);
                     break;
                 case '3':
                     puts("\nSERVER - 3 - request to delete User");
-                    deleteUser(userId, serverInfo->userList, serverInfo->client_socket, received_bytes, buffer);
+                    deleteUser(userId, serverInfo->userList, serverInfo->clientSocket, receivedBytes, buffer);
                     break;
                 case '4':
                     puts("\nSERVER - 4 - request to take/send Messages");
-                    takeMessages(userId, serverInfo->userList, serverInfo->client_socket, received_bytes, buffer);
+                    takeMessages(userId, serverInfo->userList, serverInfo->clientSocket, receivedBytes, buffer);
                     break;
                 case '5':
                     puts("\nSERVER - 5 - request to check Messages");
-                    checkMessages(userId, serverInfo->userList, serverInfo->client_socket);
+                    checkMessages(userId, serverInfo->userList, serverInfo->clientSocket);
                     break;
                 case '6':
                     puts("\nSERVER - 6 - request to close client");
@@ -272,20 +271,20 @@ void *handleClient(void *args) {
     }
 //        if (userIdInt < 0 || userIdInt > 999) {
 //            puts("\nSERVER - User Id is out of range");
-//            close(serverInfo->client_socket);
+//            close(serverInfo->clientSocket);
 //            free(serverInfo);
 //            exit(EXIT_FAILURE);
 //        }
 
 
     // Close the connection
-    close(serverInfo->client_socket);
+    close(serverInfo->clientSocket);
     free(serverInfo);
 }
 
 //// Menu Operations
 // Client -> 1. get contacts
-void sendContacts(char userId[4], User **userList, int client_socket) {
+void sendContacts(char userId[4], User **userList, int clientSocket) {
     // Search for the user with the specified userId
     pthread_mutex_lock(&userList_mutex);
     User *currentUser = *userList;
@@ -299,7 +298,7 @@ void sendContacts(char userId[4], User **userList, int client_socket) {
             // Iterate through the contacts and append them to the message
             if (currentContact == NULL) {
                 char *noContactMessage = "There is no contact";
-                send(client_socket, noContactMessage, strlen(noContactMessage), 0);
+                send(clientSocket, noContactMessage, strlen(noContactMessage), 0);
                 pthread_mutex_unlock(&userList_mutex);
                 return;
             }
@@ -319,7 +318,7 @@ void sendContacts(char userId[4], User **userList, int client_socket) {
             // Send the contacts message to the client
             puts("\nSERVER - 1 - send message: ");
             puts(contactsMessage);
-            send(client_socket, contactsMessage, strlen(contactsMessage), 0);
+            send(clientSocket, contactsMessage, strlen(contactsMessage), 0);
             pthread_mutex_unlock(&userList_mutex);
             return;
         }
@@ -331,26 +330,25 @@ void sendContacts(char userId[4], User **userList, int client_socket) {
     char notFoundMessage[MAX_BUFFER_SIZE];
     snprintf(notFoundMessage, sizeof(notFoundMessage), "User %s not found",
              userId);
-    send(client_socket, notFoundMessage, strlen(notFoundMessage), 0);
+    send(clientSocket, notFoundMessage, strlen(notFoundMessage), 0);
     pthread_mutex_unlock(&userList_mutex);
 }
 
 // Client -> 2. add contact
-
 void
-addUserToContact(char userId[4], User **userList, int client_socket, ssize_t received_bytes,
+addUserToContact(char userId[4], User **userList, int clientSocket, ssize_t receivedBytes,
                  char buffer[MAX_BUFFER_SIZE]) {
     pthread_mutex_lock(&userList_mutex);
 //    char buffer[MAX_BUFFER_SIZE];
-//    ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
+//    ssize_t receivedBytes = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
 
-    if (received_bytes < 0) {
+    if (receivedBytes < 0) {
         pthread_mutex_unlock(&userList_mutex);
         perror("Error receiving data from client");
         return;
     }
 
-    buffer[received_bytes] = '\0'; // Null-terminate the received data
+    buffer[receivedBytes] = '\0'; // Null-terminate the received data
 
     // Parse the received data
     char contactId[4], phoneNumber[14], name[30], surname[15];
@@ -398,7 +396,7 @@ addUserToContact(char userId[4], User **userList, int client_socket, ssize_t rec
         if (strcmp(currentContact->contactUserId, contactId) == 0) {
             // Contact already exists
             char *errorMsg = "Contact already exists";
-            send(client_socket, errorMsg, strlen(errorMsg), 0);
+            send(clientSocket, errorMsg, strlen(errorMsg), 0);
             pthread_mutex_unlock(&userList_mutex);
             return;
         }
@@ -432,16 +430,16 @@ addUserToContact(char userId[4], User **userList, int client_socket, ssize_t rec
 
     // Acknowledge the client
     char ackMessage[] = "Contact added successfully";
-    send(client_socket, ackMessage, strlen(ackMessage), 0);
+    send(clientSocket, ackMessage, strlen(ackMessage), 0);
     pthread_mutex_unlock(&userList_mutex);
 }
 
 // Client -> 3. delete contact
 void
-deleteUser(char userId[4], User **userList, int client_socket, ssize_t received_bytes, char buffer[MAX_BUFFER_SIZE]) {
+deleteUser(char userId[4], User **userList, int clientSocket, ssize_t receivedBytes, char buffer[MAX_BUFFER_SIZE]) {
     pthread_mutex_lock(&userList_mutex);
 
-    if (received_bytes < 0) {
+    if (receivedBytes < 0) {
         pthread_mutex_unlock(&userList_mutex);
         perror("Error receiving data from client");
         return;
@@ -466,7 +464,7 @@ deleteUser(char userId[4], User **userList, int client_socket, ssize_t received_
 
     if (currentUser == NULL) {
         char *errorMsg = "User not found";
-        send(client_socket, errorMsg, strlen(errorMsg), 0);
+        send(clientSocket, errorMsg, strlen(errorMsg), 0);
         pthread_mutex_unlock(&userList_mutex);
         return;
     }
@@ -479,7 +477,7 @@ deleteUser(char userId[4], User **userList, int client_socket, ssize_t received_
             free(temp);
             deleteContactFromFile(userId, recipientId);
             char *successMsg = "Contact deleted successfully";
-            send(client_socket, successMsg, strlen(successMsg), 0);
+            send(clientSocket, successMsg, strlen(successMsg), 0);
             pthread_mutex_unlock(&userList_mutex);
             return;
         }
@@ -487,17 +485,17 @@ deleteUser(char userId[4], User **userList, int client_socket, ssize_t received_
     }
 
     char *notFoundMsg = "Contact not found";
-    send(client_socket, notFoundMsg, strlen(notFoundMsg), 0);
+    send(clientSocket, notFoundMsg, strlen(notFoundMsg), 0);
     pthread_mutex_unlock(&userList_mutex);
 }
 
 // Client -> 4. take messages
 void
-takeMessages(char userId[4], User **userList, int client_socket, ssize_t received_bytes, char buffer[MAX_BUFFER_SIZE]) {
+takeMessages(char userId[4], User **userList, int clientSocket, ssize_t receivedBytes, char buffer[MAX_BUFFER_SIZE]) {
     pthread_mutex_lock(&userList_mutex);
 //    char buffer[MAX_BUFFER_SIZE];
-//    recv(client_socket, buffer, sizeof(buffer), 0);
-    if (received_bytes < 0) {
+//    recv(clientSocket, buffer, sizeof(buffer), 0);
+    if (receivedBytes < 0) {
         pthread_mutex_unlock(&userList_mutex);
         perror("Error receiving data from client");
         return;
@@ -544,12 +542,12 @@ takeMessages(char userId[4], User **userList, int client_socket, ssize_t receive
         // Recipient found. Send acknowledgment and receive message
         char ack[] = "Recipient found";
         puts("\t\tSent the message, waiting client response...");
-        send(client_socket, ack, strlen(ack), 0);
+        send(clientSocket, ack, strlen(ack), 0);
 
         puts("\t\tGet the message, continuing...");
         // Receive the message from the client
         char messageBuffer[MAX_BUFFER_SIZE];
-        ssize_t receivedBytesMessage = recv(client_socket, messageBuffer, sizeof(messageBuffer), 0);
+        ssize_t receivedBytesMessage = recv(clientSocket, messageBuffer, sizeof(messageBuffer), 0);
 
         if (receivedBytesMessage < 0) {
             perror("Error receiving data from client");
@@ -559,7 +557,7 @@ takeMessages(char userId[4], User **userList, int client_socket, ssize_t receive
         if (!strstr(messageBuffer, "mes")) {
             puts("Server - Found a dummy data!");
             char confirmMsg[] = "Terminate!";
-            send(client_socket, confirmMsg, strlen(confirmMsg), 0);
+            send(clientSocket, confirmMsg, strlen(confirmMsg), 0);
             pthread_mutex_unlock(&userList_mutex);
             return;
         } else {
@@ -612,7 +610,7 @@ takeMessages(char userId[4], User **userList, int client_socket, ssize_t receive
 
                     // Acknowledge that the message has been added
                     char confirmMsg[] = "Message added successfully";
-                    send(client_socket, confirmMsg, strlen(confirmMsg), 0);
+                    send(clientSocket, confirmMsg, strlen(confirmMsg), 0);
                     // Write the message to the recipient's messages.txt file using the addMessageToFile function
                     char message[255]; // Adjust the size as needed
                     if (strlen(messageBuffer) > 255) {
@@ -636,13 +634,13 @@ takeMessages(char userId[4], User **userList, int client_socket, ssize_t receive
     } else {
         // Recipient not found in contact list
         char errorMsg[] = "Recipient not found";
-        send(client_socket, errorMsg, strlen(errorMsg), 0);
+        send(clientSocket, errorMsg, strlen(errorMsg), 0);
     }
     pthread_mutex_unlock(&userList_mutex);
 }
 
 //  Client -> 5. check messages
-void checkMessages(char userId[4], User **userList, int client_socket) {
+void checkMessages(char userId[4], User **userList, int clientSocket) {
     pthread_mutex_lock(&userList_mutex);
 
     // Find the user in the userList
@@ -653,7 +651,7 @@ void checkMessages(char userId[4], User **userList, int client_socket) {
 
     if (currentUser == NULL) {
         char *msg = "User not found\n";
-        send(client_socket, msg, strlen(msg), 0);
+        send(clientSocket, msg, strlen(msg), 0);
     } else {
         // Iterate through the user's messages and collect unique sender IDs
         char senders[MAX_BUFFER_SIZE] = {0};
@@ -671,11 +669,11 @@ void checkMessages(char userId[4], User **userList, int client_socket) {
 
             // Send the list of senders back to the client
             puts("\t\tSending the message senders list...");
-            send(client_socket, senders, strlen(senders), 0);
+            send(clientSocket, senders, strlen(senders), 0);
 
             // Receive the sender ID from the client
             char senderId[4];
-            ssize_t receivedBytes = recv(client_socket, senderId, sizeof(senderId), 0);
+            ssize_t receivedBytes = recv(clientSocket, senderId, sizeof(senderId), 0);
             puts("\t\tReceived the sender ID from the client...");
             if (receivedBytes < 0) {
                 perror("Error receiving data from client");
@@ -710,11 +708,11 @@ void checkMessages(char userId[4], User **userList, int client_socket) {
                     printf("\t\tComparison %d", strcmp(senderId, message->correspondentId) == 0);
                     printf("\t\tMessage: %s\n", messageToSend);
                     puts("\t\tSending the message to the client...");
-                    send(client_socket, messageToSend, strlen(messageToSend), 0);
+                    send(clientSocket, messageToSend, strlen(messageToSend), 0);
                     flagSentMessage = true;
                     // control whether the message is sent or not
                     char confirmMsg[MAX_BUFFER_SIZE];
-                    ssize_t receivedBytesConfirm = recv(client_socket, confirmMsg, sizeof(confirmMsg), 0);
+                    ssize_t receivedBytesConfirm = recv(clientSocket, confirmMsg, sizeof(confirmMsg), 0);
                     if (receivedBytesConfirm < 0) {
                         perror("Error receiving data from client");
                         pthread_mutex_unlock(&userList_mutex);
@@ -741,18 +739,18 @@ void checkMessages(char userId[4], User **userList, int client_socket) {
 //            printf("flag %d\n", flagSentMessage);
             if (flagSentMessage) {
                 char *msgTerminate = "Finish";
-                send(client_socket, msgTerminate, strlen(msgTerminate), 0);
+                send(clientSocket, msgTerminate, strlen(msgTerminate), 0);
                 puts("\t\tFinished the messages...");
             } else {
                 char *msgTerminate = "Terminate";
-                send(client_socket, msgTerminate, strlen(msgTerminate), 0);
+                send(clientSocket, msgTerminate, strlen(msgTerminate), 0);
                 puts("\t\tThere is no Message Sender as such...");
             }
 
         } else {
             // there is no message
             char *msg = "No message";
-            send(client_socket, msg, strlen(msg), 0);
+            send(clientSocket, msg, strlen(msg), 0);
         }
     }
 

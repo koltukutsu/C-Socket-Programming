@@ -26,7 +26,7 @@ typedef struct {
 typedef struct client_t {
     char userId[4];
     int clientSocket;
-} client_t;
+} clientType;
 
 int showMenu();
 
