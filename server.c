@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PORT 8005
+#define PORT 4001
 #define MAX_BUFFER_SIZE 1024
 
 pthread_mutex_t userList_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -556,19 +556,32 @@ takeMessages(char userId[4], User **userList, int client_socket, ssize_t receive
             pthread_mutex_unlock(&userList_mutex);
             return;
         }
-
-        messageBuffer[receivedBytesMessage] = '\0'; // Ensure null-termination
+        if (!strstr(messageBuffer, "mes")) {
+            puts("Server - Found a dummy data!");
+            char confirmMsg[] = "Terminate!";
+            send(client_socket, confirmMsg, strlen(confirmMsg), 0);
+            pthread_mutex_unlock(&userList_mutex);
+            return;
+        } else {
+            // move messageBuffer 4 char to right
+            puts("Server - Normal message, continuing...");
+            memmove(messageBuffer, messageBuffer + 4, strlen(messageBuffer) - 4);
+        }
+        // last character is deleted which was : in the messageBuffer
+        messageBuffer[receivedBytesMessage - 5] = '\0'; // Ensure null-termination
         strcpy(recipientId, formatUserIdOneInput(recipientId));
 //        formatUserId(recipientId, recipientId);
 
         // TODO: Add the message to the recipient's messages list
         // A recipient is found with the recipientId, so the message is added to the recipient's message list.
         User *recipientUser = *userList;
+        printf("\t\tTaken message: %s\n", messageBuffer);
+        puts("....");
         bool flagOut = false;
         while (recipientUser != NULL && !flagOut) {
-            puts("\n comparison");
-            puts(recipientUser->userId);
-            puts(recipientId);
+//            puts("\n comparison");
+//            puts(recipientUser->userId);
+//            puts(recipientId);
             if (strcmp(recipientUser->userId, recipientId) == 0) {
                 // Found the recipient user
                 Message *newMessage = (Message *) malloc(sizeof(Message));
@@ -582,10 +595,20 @@ takeMessages(char userId[4], User **userList, int client_socket, ssize_t receive
                     newMessage->correspondentId[sizeof(newMessage->correspondentId) - 1] = '\0';
                     strncpy(newMessage->message, messageBuffer, sizeof(newMessage->message) - 1);
                     newMessage->message[sizeof(newMessage->message) - 1] = '\0';
+                    // // Insert the new message at the beginning of the recipient's messages list
+                    // newMessage->nextMessage = recipientUser->messagesList;
+                    // recipientUser->messagesList = newMessage;
 
-                    // Insert the new message at the beginning of the recipient's messages list
-                    newMessage->nextMessage = recipientUser->messagesList;
-                    recipientUser->messagesList = newMessage;
+                    // Add to the end of the messages list
+                    if (!recipientUser->messagesList) {
+                        recipientUser->messagesList = newMessage;
+                    } else {
+                        Message *current = recipientUser->messagesList;
+                        while (current->nextMessage) {
+                            current = current->nextMessage;
+                        }
+                        current->nextMessage = newMessage;
+                    }
 
                     // Acknowledge that the message has been added
                     char confirmMsg[] = "Message added successfully";
@@ -604,7 +627,7 @@ takeMessages(char userId[4], User **userList, int client_socket, ssize_t receive
 
 
             } else {
-                puts("Recipient not found");
+                puts("Recipient not found in your Contact List!");
 
             }
             recipientUser = recipientUser->nextUser;
@@ -668,9 +691,14 @@ void checkMessages(char userId[4], User **userList, int client_socket) {
             puts(currentUser->userId);
             puts("\t\tWanted Sender ID:");
             puts(senderId);
-            char messageToSend[MAX_BUFFER_SIZE];
             bool flagSentMessage = false;
+            printf("flag %d\n", flagSentMessage);
             while (message != NULL) {
+                char messageToSend[MAX_BUFFER_SIZE] = {0};
+                printf("\tMessage Sender ID: %s\n", message->correspondentId);
+                printf("\tClient Sender ID %s\n", senderId);
+                printf("\tMessage: %s\n", message->message);
+                printf("\tComparison %d\n", strcmp(senderId, message->correspondentId) == 0);
                 if (strcmp(senderId, message->correspondentId) == 0) {
 //                    strcpy(messageToSend, "Message: ");
 //                    strcpy(messageToSend, "\t - ");
@@ -679,6 +707,9 @@ void checkMessages(char userId[4], User **userList, int client_socket) {
                     // terminate the message string
                     messageToSend[strlen(messageToSend)] = '\0';
                     // send the message to the client
+                    printf("\t\tComparison %d", strcmp(senderId, message->correspondentId) == 0);
+                    printf("\t\tMessage: %s\n", messageToSend);
+                    puts("\t\tSending the message to the client...");
                     send(client_socket, messageToSend, strlen(messageToSend), 0);
                     flagSentMessage = true;
                     // control whether the message is sent or not
@@ -707,6 +738,7 @@ void checkMessages(char userId[4], User **userList, int client_socket) {
                 message = message->nextMessage;
 
             }
+            printf("flag %d\n", flagSentMessage);
             if (flagSentMessage) {
                 char *msgTerminate = "Finish";
                 send(client_socket, msgTerminate, strlen(msgTerminate), 0);
@@ -991,19 +1023,41 @@ void loadMessagesFromFile(const char *filePath, Message **messagesList) {
         return;
     }
 
-    char line[256];
+    // Dynamic array to store messages temporarily
+    char (*tempMessages)[255 + 4] = malloc(10 * sizeof(*tempMessages));
+    int messageCount = 0, arraySize = 10;
+
+    char line[255 + 4];
     bool isEmpty = true;
 
     while (fgets(line, sizeof(line), file)) {
         isEmpty = false;
-        Message *newMessage = (Message *) malloc(sizeof(Message));
+
+        // Resize array if necessary
+        if (messageCount == arraySize) {
+            arraySize *= 2;
+            tempMessages = realloc(tempMessages, arraySize * sizeof(*tempMessages));
+            if (!tempMessages) {
+                perror("Error reallocating memory");
+                break;
+            }
+        }
+
+        // Store message in array
+        strncpy(tempMessages[messageCount], line, sizeof(*tempMessages) - 1);
+        tempMessages[messageCount][sizeof(*tempMessages) - 1] = '\0'; // Ensure null-termination
+        messageCount++;
+    }
+
+    // Read messages in reverse order and add to the list
+    for (int i = messageCount - 1; i >= 0; i--) {
+        Message *newMessage = (Message *)malloc(sizeof(Message));
         if (newMessage == NULL) {
             perror("Error allocating memory for new message");
             continue;
         }
 
-        // Assuming each line in messages.txt is formatted as "correspondentId:message"
-        sscanf(line, "%3[^:]:%254[^\n]", newMessage->correspondentId, newMessage->message);
+        sscanf(tempMessages[i], "%3[^:]:%254[^\n]", newMessage->correspondentId, newMessage->message);
         newMessage->nextMessage = *messagesList;
         *messagesList = newMessage;
         printf("\n\t\t\tCorrespondent ID: %s, Message: %s", newMessage->correspondentId, newMessage->message);
@@ -1011,11 +1065,12 @@ void loadMessagesFromFile(const char *filePath, Message **messagesList) {
 
     if (isEmpty) {
         printf("\n\t\t\tNo messages found in file: %s", filePath);
+    } else {
+        free(tempMessages);
     }
 
     fclose(file);
 }
-
 void loadDatabase(User **userList) {
     DIR *dir;
     struct dirent *entry;

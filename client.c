@@ -12,7 +12,7 @@
 #include <pthread.h>
 
 #define SERVER_IP "127.0.0.1"
-#define PORT 8005
+#define PORT 4001
 #define MAX_BUFFER_SIZE 1024
 
 typedef struct {
@@ -68,14 +68,14 @@ int main(int argc, char *argv[]) {
     } else {
         formatUserId(argv[1], userId);
         // strcpy(userId, argv[1]);
-        printf("\tCLIENT %s - Assigned User ID: %s\n", userId, userId);
+        printf("\033[33m\tCLIENT %s - Assigned User ID: %s\n\033[0m", userId, userId);
     }
     // Create a socket
     if ((client_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("Error creating socket");
         exit(EXIT_FAILURE);
     } else {
-        printf("\tCLIENT %s - Connected to the server.\n", userId);
+        printf("\033[33m\tCLIENT %s - Connected to the server.\n\033[0m", userId);
     }
 
     // Set up the server address structure
@@ -112,8 +112,9 @@ int main(int argc, char *argv[]) {
 }
 
 int showMenu() {
-    int choice;
+    int choice = 0;
     bool continueClient = true;
+
     do {
         printf("\n\n<--- MENU ---> \n");
         printf("1. List Contacts\n");
@@ -122,17 +123,26 @@ int showMenu() {
         printf("4. Send Messages\n");
         printf("5. Check Messages\n");
         printf("6. Close the client\n");
-        printf("Choice: ");
-        scanf("%d", &choice);
+        printf("\tChoice: ");
 
-        if (choice > 6 || choice <= 0) {
-            printf("\033[33mPlease choose a valid Menu Option!\n\033[0m");
+        if (scanf("%d", &choice) != 1) {
+            // If scanf fails to read an integer
+            printf("\033[33m\tPlease enter a valid number.\n\033[0m");
+
+            // Clearing the input buffer
+            int c;
+            while ((c = getchar()) != '\n' && c != EOF) {}
+
+            continueClient = true;
+        } else if (choice > 6 || choice < 1) {
+            // If choice is outside the valid range
+            printf("\033[33m\tPlease choose a valid Menu Option!\n\033[0m");
             continueClient = true;
         } else {
             continueClient = false;
         }
-
     } while (continueClient);
+
     return choice;
 }
 // void sendUserId(int client_socket, char userId[4]) {
@@ -206,8 +216,8 @@ void getContacts(char userId[4], int client_socket) {
     char command[MAX_BUFFER_SIZE];
     strcpy(command, userId);
     strcat(command, ":1");
-    puts("\nCLIENT - get contacts: ");
-    puts(command);
+//    puts("\nCLIENT - get contacts: ");
+//    puts(command);
     send(client_socket, command, strlen(command), 0);
 
     // Server response
@@ -215,7 +225,7 @@ void getContacts(char userId[4], int client_socket) {
     ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
     if (received_bytes > 0) {
         buffer[received_bytes] = '\0'; // Null-terminate the received data
-        printf("Server response: %s\n", buffer);
+//        printf("Server response: %s\n", buffer);
 
         // Check if the response is a user not found message
         if (strstr(buffer, "User ") && strstr(buffer, " not found")) {
@@ -301,7 +311,7 @@ void deleteUser(char userId[4], int client_socket) {
     ssize_t received_bytes = recv(client_socket, buffer, sizeof(buffer), 0);
     if (received_bytes > 0) {
         buffer[received_bytes] = '\0'; // Null-terminate the received data
-        if(strcmp(buffer, "Contact not found") == 0) {
+        if (strcmp(buffer, "Contact not found") == 0) {
             printf("\033[31m\tError: %s\n\033[0m", buffer);
         } else {
             printf("\033[32m\tUser deleted successfully!\n\033[0m");
@@ -351,7 +361,6 @@ void sendMessages(char userId[4], int client_socket) {
         return;
     }
 
-    //// SECOND
     // third part: send the message
     char message[255];
     printf("\tEnter your message: ");
@@ -359,7 +368,7 @@ void sendMessages(char userId[4], int client_socket) {
     message[strcspn(message, "\n")] = 0;  // Remove newline character
     // third part: Send the message to the recipient
     char fullMessage[MAX_BUFFER_SIZE];
-    snprintf(fullMessage, sizeof(fullMessage), "%s", message);
+    snprintf(fullMessage, sizeof(fullMessage), "mes:%s:", message);
     send(client_socket, fullMessage, strlen(fullMessage), 0);
 
     char bufferFinal[MAX_BUFFER_SIZE];
@@ -367,6 +376,10 @@ void sendMessages(char userId[4], int client_socket) {
     if (received_bytes_final > 0) {
         bufferFinal[received_bytes_final] = '\0'; // Null-terminate the received data
 //        printf("Server response: %s\n", bufferFinal);
+        if (strcmp(bufferFinal, "Terminate") == 0) {
+            printf("\033[31m\tError: %s\n\033[0m", bufferFinal);
+            return;
+        }
         printf("\033[32m\tMessage sent successfully!\n\033[0m");
     } else {
         perror("Client - Error receiving data from server");
@@ -390,7 +403,7 @@ void checkMessages(char userId[4], int client_socket) {
     if (received_bytes > 0) {
 //        printf("Server response: %s\n", buffer);
         if (strstr(buffer, "No message")) {
-            printf("\tThere are no messages yet!\n");
+            printf("\033[33m\tThere are no messages yet!\n\033[0m");
             return;
         } else {
             printf("\tUser has messages, continuing...\n");
@@ -408,22 +421,24 @@ void checkMessages(char userId[4], int client_socket) {
             // Receive the messages one by one
             printf("\nMessages from User %s:\n", senderId);
             bool flagContinue = true;
-            char takenMessage[MAX_BUFFER_SIZE];
+
             int counter = 0;
 
             while (flagContinue) {
                 counter++;
+                char takenMessage[MAX_BUFFER_SIZE] = {0};
                 ssize_t receivedBytesMessage = recv(client_socket, takenMessage, sizeof(takenMessage), 0);
                 takenMessage[receivedBytesMessage] = '\0';
-                if (strstr(takenMessage, "Terminate")) {
+//                printf("Response: %s\n", takenMessage);
+                if (strcmp(takenMessage, "Terminate") == 0) {
                     printf("\033[31m\tThere are no messages from this sender!\n\033[0m");
                     flagContinue = false;
                 } else {
-                    if (strcmp(takenMessage, "Finish")) {
+                    if (strcmp(takenMessage, "Finish") == 0) {
                         printf("\033[33m\tEnd of messages...\n\033[0m");
                         flagContinue = false;
                     } else {
-                        printf("\t12%s\n", takenMessage);
+                        printf("%s\n", takenMessage);
                         // confirm that the message is taken
                         char confirmMessage[MAX_BUFFER_SIZE];
                         snprintf(confirmMessage, sizeof(confirmMessage), "%s", "Message received");
@@ -431,8 +446,6 @@ void checkMessages(char userId[4], int client_socket) {
 
                     }
                 }
-
-
             }
 //            printf("\tEnd of messages...\n");
             // Display the messages
