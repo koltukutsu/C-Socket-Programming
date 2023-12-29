@@ -456,6 +456,11 @@ takeMessages(char userId[4], User **userList, int client_socket, ssize_t receive
     pthread_mutex_lock(&userList_mutex);
 //    char buffer[MAX_BUFFER_SIZE];
 //    recv(client_socket, buffer, sizeof(buffer), 0);
+    if (received_bytes < 0) {
+        pthread_mutex_unlock(&userList_mutex);
+        perror("Error receiving data from client");
+        return;
+    }
 
     char *token;
     char recipientId[4];

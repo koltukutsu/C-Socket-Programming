@@ -47,9 +47,11 @@ void sendMessages(char userId[4], int client_socket);
 void checkMessages(char userId[4], int client_socket);
 
 //// UTILS
-void promptForUserInfo(UserInfo *userInfo);
+bool promptForUserInfo(char userId[4], UserInfo *userInfo);
 
 void formatUserId(char *input, char *userId);
+
+char *formatUserIdOneInput(const char *input);
 
 int main(int argc, char *argv[]) {
     int client_socket;
@@ -64,7 +66,6 @@ int main(int argc, char *argv[]) {
         printf("\033[31m\tClient - Closing the client now...\n\033[0m");
         return 32;
     } else {
-        printf("%s\n", argv[1]);
         formatUserId(argv[1], userId);
         // strcpy(userId, argv[1]);
         printf("\tCLIENT %s - Assigned User ID: %s\n", userId, userId);
@@ -245,7 +246,11 @@ void getContacts(char userId[4], int client_socket) {
 // 2. add user
 void addUser(char userId[4], int client_socket) {
     UserInfo userInfo;
-    promptForUserInfo(&userInfo);
+    bool isYourself = promptForUserInfo(userId, &userInfo);
+    if (isYourself) {
+        printf("\033[31m\tError: You cannot add yourself to your Contact List!\n\033[0m");
+        return;
+    }
 
     char message[MAX_BUFFER_SIZE];
     snprintf(message, MAX_BUFFER_SIZE, "%s:2:%s_%s_%s_%s", userId, userInfo.id, userInfo.phone, userInfo.name,
@@ -295,7 +300,13 @@ void sendMessages(char userId[4], int client_socket) {
     printf("Enter recipient's User ID: ");
     scanf("%3s", recipientId);
     getchar();  // Clear newline character from the buffer
-
+    recipientId[3] = '\0';  // Ensure string is null-terminated
+    strcpy(recipientId, formatUserIdOneInput(recipientId));
+    printf("Here is the recipient ID: %s\n", recipientId);
+    if (strcmp(userId, recipientId) == 0) {
+        printf("\033[31m\tError: You cannot send a message to yourself!\n\033[0m");
+        return;
+    }
     //// FIRST
     // First part: Send the client userID and mode
     char initialCommand[MAX_BUFFER_SIZE];
@@ -308,7 +319,10 @@ void sendMessages(char userId[4], int client_socket) {
     if (received_bytes > 0) {
         buffer[received_bytes] = '\0'; // Null-terminate the received data
 //        printf("Server response: %s\n", buffer);
-        if (strstr(buffer, "Recipient not found")) {
+        if (strcmp(buffer, "Same") == 0) {
+            printf("\033[31m\tError: You cannot send a message to yourself!\n\033[0m");
+            return;
+        } else if (strstr(buffer, "Recipient not found")) {
             printf("\033[31m\tError: %s\n\033[0m", buffer);
             return;
         } else {
@@ -414,13 +428,18 @@ void checkMessages(char userId[4], int client_socket) {
 
 
 //// Utils
-void promptForUserInfo(UserInfo *userInfo) {
+bool promptForUserInfo(char userId[4], UserInfo *userInfo) {
     printf("\nEnter ID, Mobile Phone, Name, Surname, in order:\n");
 
     printf("ID: ");
     scanf("%9s", userInfo->id);
+    strcpy(userInfo->id, formatUserIdOneInput(userInfo->id));
     // Clear the input buffer
     while (getchar() != '\n');
+
+    if (strcmp(userId, userInfo->id) == 0) {
+        return true;
+    }
 
     printf("Phone: ");
     scanf("%13s", userInfo->phone);
@@ -436,6 +455,7 @@ void promptForUserInfo(UserInfo *userInfo) {
     printf("Surname: ");
     // Read up to 14 characters until a newline is encountered
     scanf("%14[^\n]", userInfo->surname);
+    return false;
 }
 
 void formatUserId(char *input, char *userId) {
@@ -453,4 +473,27 @@ void formatUserId(char *input, char *userId) {
         userId[2] = input[2];
     }
     userId[3] = '\0';  // Ensure string is null-terminated
+}
+
+char *formatUserIdOneInput(const char *input) {
+    char *userId = malloc(4 * sizeof(char));  // Allocate memory for userId
+    if (!userId) {
+        perror("Memory allocation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    if (strlen(input) == 2) {
+        userId[0] = '0';
+        userId[1] = input[0];
+        userId[2] = input[1];
+    } else if (strlen(input) == 1) {
+        userId[0] = '0';
+        userId[1] = '0';
+        userId[2] = input[0];
+    } else {
+        strncpy(userId, input, 3);  // Copy first 3 characters
+    }
+    userId[3] = '\0';  // Ensure string is null-terminated
+
+    return userId;
 }
