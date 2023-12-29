@@ -96,9 +96,13 @@ int main(int argc, char *argv[]) {
 //    perror("Thread creation failed");
 //    exit(EXIT_FAILURE);
 //  }
-
+    bool initiation = true; 
     do {
-        initiationOfClient(userId, clientSocket);
+        if(initiation) {
+            initiationOfClient(userId, clientSocket); 
+            initiation = false;
+        }
+        
         choice = showMenu();
         userChoiceOperations(choice, clientSocket, userId);
     } while (choice != 6);
